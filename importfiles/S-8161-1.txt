@@ -1,0 +1,209 @@
+Type	Item No	Item Name	Qty	Color ID	Extra?	Alternate?	Match ID	Counterpart?
+
+P	3957	Antenna 1 x 4	4	86	N	N	0	N	
+P	4735	Bar 1 x 3 with Clip and Stud Receptacle (Robot Arm)	1	11	N	N	0	N	
+P	30374	Bar 4L (Lightsaber Blade / Wand)	2	11	N	N	0	N	
+P	6111	Brick 1 x 10	4	86	N	N	0	N	
+P	6112	Brick 1 x 12	3	1	N	N	0	N	
+P	3004	Brick 1 x 2	5	11	N	N	0	N	
+P	3004	Brick 1 x 2	1	5	N	N	0	N	
+P	2454	Brick 1 x 2 x 5	10	1	N	N	0	N	
+P	2454	Brick 1 x 2 x 5	4	86	N	N	0	N	
+P	3622	Brick 1 x 3	2	11	N	N	0	N	
+P	3622	Brick 1 x 3	4	85	N	N	0	N	
+P	3010	Brick 1 x 4	1	86	N	N	0	N	
+P	3010	Brick 1 x 4	4	1	N	N	0	N	
+P	3009	Brick 1 x 6	1	85	N	N	0	N	
+P	3008	Brick 1 x 8	3	1	N	N	0	N	
+P	2456	Brick 2 x 6	2	86	N	N	0	N	
+P	3007	Brick 2 x 8	1	11	N	N	0	N	
+P	3007	Brick 2 x 8	1	86	N	N	0	N	
+P	6183	Brick, Arch 1 x 6 x 2 Curved Top	4	11	N	N	0	N	
+P	4070	Brick, Modified 1 x 1 with Headlight	10	11	N	N	0	N	
+P	2458	Brick, Modified 1 x 2 with Pin	2	86	N	N	0	N	
+P	2458	Brick, Modified 1 x 2 with Pin	2	1	N	N	0	N	
+P	6232	Brick, Modified 2 x 2 with Pin and Axle Hole	2	1	N	N	0	N	
+P	30592	Brick, Modified 2 x 2 with Top Pin and 1 x 2 Side Plates	1	85	N	N	0	N	
+P	3941	Brick, Round 2 x 2	2	11	N	N	0	N	
+P	48092	Brick, Round Corner 4 x 4 Macaroni Wide with 3 Studs	4	86	N	N	0	N	
+P	62361	Vehicle, Mudguard 1 1/2 x 6 x 1 with Arch	5	1	N	N	0	N	
+P	3829c01	Vehicle, Steering Stand 1 x 2 with Black Steering Wheel	1	3	N	N	0	N	
+P	3829c01	Vehicle, Steering Stand 1 x 2 with Black Steering Wheel	2	1	N	N	0	N	
+P	4589	Cone 1 x 1 without Top Groove	2	85	N	N	1	N	
+P	4532	Container, Cupboard 2 x 3 x 2	1	5	N	N	2	N	
+P	4533	Container, Cupboard 2 x 3 x 2 Door	1	1	N	N	0	N	
+P	2335	Flag 2 x 2 Square	4	1	N	N	0	N	
+P	3938	Hinge Brick 1 x 2 Top Plate Thin	4	11	N	N	0	N	
+P	4528	Minifig, Utensil Frying Pan	4	11	N	N	0	N	
+P	4522	Minifig, Utensil Mallet / Hammer	1	11	N	N	0	N	
+P	4079b	Minifig, Utensil Seat 2 x 2 with Center Sprue Mark	2	11	N	N	0	N	
+P	4006	Minifig, Utensil Spanner / Screwdriver	1	11	N	N	0	N	
+P	6246	Minifig, Utensil Tool Wheel (set of 6 tools on sprue)	1	11	N	N	0	N	
+P	2550c01	Monkey	1	88	N	N	0	N	
+P	6231	Panel 1 x 1 x 1 Corner	2	1	N	N	0	N	
+P	6231	Panel 1 x 1 x 1 Corner	4	86	N	N	0	N	
+P	4865	Panel 1 x 2 x 1	3	86	N	N	0	N	
+P	4865	Panel 1 x 2 x 1	2	1	N	N	0	N	
+P	59349	Panel 1 x 6 x 5	2	1	N	N	0	N	
+P	4477	Plate 1 x 10	1	11	N	N	0	N	
+P	3023	Plate 1 x 2	1	1	N	N	0	N	
+P	3023	Plate 1 x 2	4	86	N	N	0	N	
+P	3023	Plate 1 x 2	2	11	N	N	0	N	
+P	3023	Plate 1 x 2	6	85	N	N	0	N	
+P	3623	Plate 1 x 3	4	1	N	N	0	N	
+P	3710	Plate 1 x 4	2	86	N	N	0	N	
+P	3710	Plate 1 x 4	2	1	N	N	0	N	
+P	3666	Plate 1 x 6	1	5	N	N	0	N	
+P	3666	Plate 1 x 6	3	86	N	N	0	N	
+P	3666	Plate 1 x 6	7	11	N	N	0	N	
+P	3666	Plate 1 x 6	8	1	N	N	0	N	
+P	3460	Plate 1 x 8	6	11	N	N	0	N	
+P	4282	Plate 2 x 16	4	86	N	N	0	N	
+P	3022	Plate 2 x 2	4	1	N	N	0	N	
+P	3022	Plate 2 x 2	1	85	N	N	0	N	
+P	2420	Plate 2 x 2 Corner	4	1	N	N	0	N	
+P	2420	Plate 2 x 2 Corner	4	86	N	N	0	N	
+P	2420	Plate 2 x 2 Corner	2	3	N	N	0	N	
+P	2420	Plate 2 x 2 Corner	2	11	N	N	0	N	
+P	3021	Plate 2 x 3	5	11	N	N	0	N	
+P	3020	Plate 2 x 4	7	11	N	N	0	N	
+P	3020	Plate 2 x 4	4	85	N	N	0	N	
+P	3020	Plate 2 x 4	2	86	N	N	0	N	
+P	3020	Plate 2 x 4	1	5	N	N	0	N	
+P	3795	Plate 2 x 6	1	1	N	N	0	N	
+P	3795	Plate 2 x 6	4	11	N	N	0	N	
+P	3034	Plate 2 x 8	4	11	N	N	0	N	
+P	3034	Plate 2 x 8	2	1	N	N	0	N	
+P	3034	Plate 2 x 8	1	86	N	N	0	N	
+P	3031	Plate 4 x 4	4	86	N	N	0	N	
+P	3031	Plate 4 x 4	4	85	N	N	0	N	
+P	3032	Plate 4 x 6	1	11	N	N	0	N	
+P	3035	Plate 4 x 8	2	1	N	N	0	N	
+P	3036	Plate 6 x 8	1	11	N	N	0	N	
+P	41539	Plate 8 x 8	1	11	N	N	0	N	
+P	4081b	Plate, Modified 1 x 1 with Clip Light - Thick Ring	2	86	N	N	0	N	
+P	4085c	Plate, Modified 1 x 1 with Clip Vertical - Type 3 (thick U clip)	4	1	N	N	0	N	
+P	49668	Plate, Modified 1 x 1 with Tooth	2	66	N	N	0	N	
+P	3794	Plate, Modified 1 x 2 with 1 Stud (Jumper)	2	1	N	N	0	N	
+P	3794	Plate, Modified 1 x 2 with 1 Stud (Jumper)	15	11	N	N	0	N	
+P	2540	Plate, Modified 1 x 2 with Handle on Side - Free Ends	4	11	N	N	0	N	
+P	48336	Plate, Modified 1 x 2 with Handle on Side - Closed Ends	2	11	N	N	0	N	
+P	4073	Plate, Round 1 x 1 Straight Side	7	3	N	N	0	N	
+P	4073	Plate, Round 1 x 1 Straight Side	1	3	Y	N	0	N	
+P	4073	Plate, Round 1 x 1 Straight Side	5	11	N	N	0	N	
+P	4073	Plate, Round 1 x 1 Straight Side	1	11	Y	N	0	N	
+P	4032	Plate, Round 2 x 2 with Axle Hole	2	86	N	N	3	N	
+P	4032	Plate, Round 2 x 2 with Axle Hole	2	1	N	N	0	N	
+P	30357	Plate, Round Corner 3 x 3	2	11	N	N	0	N	
+P	4515	Slope 10 6 x 8	1	86	N	N	0	N	
+P	54200	Slope 30 1 x 1 x 2/3	4	85	N	N	0	N	
+P	54200	Slope 30 1 x 1 x 2/3	4	11	N	N	0	N	
+P	54200	Slope 30 1 x 1 x 2/3	4	1	N	N	0	N	
+P	54200	Slope 30 1 x 1 x 2/3	9	3	N	N	0	N	
+P	4286	Slope 33 3 x 1	4	11	N	N	0	N	
+P	3039	Slope 45 2 x 2	1	1	N	N	0	N	
+P	3038	Slope 45 2 x 3	2	11	N	N	0	N	
+P	30249	Slope 55 6 x 1 x 5	4	86	N	N	0	N	
+P	50950	Slope, Curved 3 x 1 No Studs	4	85	N	N	0	N	
+P	61678	Slope, Curved 4 x 1 No Studs	14	11	N	N	0	N	
+P	61678	Slope, Curved 4 x 1 No Studs	5	3	N	N	0	N	
+P	61678	Slope, Curved 4 x 1 No Studs	11	1	N	N	0	N	
+P	42022	Slope, Curved 6 x 1	1	11	N	N	0	N	
+P	44126	Slope, Curved 6 x 2	1	11	N	N	0	N	
+P	44126	Slope, Curved 6 x 2	1	1	N	N	0	N	
+P	3665	Slope, Inverted 45 2 x 1	2	1	N	N	0	N	
+P	3665	Slope, Inverted 45 2 x 1	2	11	N	N	0	N	
+P	3676	Slope, Inverted 45 2 x 2 Double Convex	2	1	N	N	0	N	
+P	58827	Support 2 x 2 x 10 Girder Triangular Vertical - Type 3 - 3 Posts, 2 Sections	4	85	N	N	0	N	
+P	4476	Support 2 x 4 x 5 Stanchion Inclined, 5mm wide posts	5	1	N	N	0	N	
+P	4599	Tap 1 x 1	2	86	N	N	0	N	
+P	4265c	Technic Bush 1/2 Smooth	4	86	N	N	0	N	
+P	4265c	Technic Bush 1/2 Smooth	1	86	Y	N	0	N	
+P	3707	Technic, Axle 8	2	11	N	N	0	N	
+P	3749	Technic, Axle Pin without Friction Ridges Lengthwise	9	2	N	N	0	N	
+P	3703	Technic, Brick 1 x 16 with Holes	6	11	N	N	0	N	
+P	3700	Technic, Brick 1 x 2 with Hole	1	86	N	N	0	N	
+P	40344	Technic, Brick 4 x 6 Open Center	1	86	N	N	0	N	
+P	2780	Technic, Pin with Friction Ridges Lengthwise WITH Center Slots	4	11	N	N	0	N	
+P	3069b	Tile 1 x 2 with Groove	16	11	N	N	0	N	
+P	3069b	Tile 1 x 2 with Groove	18	1	N	N	0	N	
+P	3069b	Tile 1 x 2 with Groove	11	85	N	N	0	N	
+P	3069b	Tile 1 x 2 with Groove	2	3	N	N	0	N	
+P	2431	Tile 1 x 4	1	3	N	N	0	N	
+P	2431	Tile 1 x 4	2	85	N	N	0	N	
+P	6636	Tile 1 x 6	2	3	N	N	0	N	
+P	6636	Tile 1 x 6	2	11	N	N	0	N	
+P	6636	Tile 1 x 6	2	85	N	N	0	N	
+P	4162	Tile 1 x 8	3	1	N	N	0	N	
+P	3068b	Tile 2 x 2 with Groove	2	11	N	N	0	N	
+P	3068b	Tile 2 x 2 with Groove	1	1	N	N	0	N	
+P	3068b	Tile 2 x 2 with Groove	1	85	N	N	0	N	
+P	2555	Tile, Modified 1 x 1 with Clip	8	11	N	N	0	N	
+P	2432	Tile, Modified 1 x 2 with Handle	1	11	N	N	0	N	
+P	2432	Tile, Modified 1 x 2 with Handle	1	3	N	N	0	N	
+P	30648	Tire 24 x 14 Shallow Tread (Tread Small Hub)	14	11	N	N	0	N	
+P	3680c02	Turntable 2 x 2 Plate, Complete Assembly with Light Bluish Gray Top	2	11	N	N	0	N	
+P	42061	Wedge 12 x 3 Left	1	1	N	N	0	N	
+P	42060	Wedge 12 x 3 Right	1	1	N	N	0	N	
+P	43710	Wedge 4 x 2 Triple Left	2	85	N	N	0	N	
+P	43711	Wedge 4 x 2 Triple Right	2	85	N	N	0	N	
+P	43712	Wedge 6 x 4 Triple Curved	1	1	N	N	0	N	
+P	41768	Wedge 4 x 2 Left	1	1	N	N	0	N	
+P	41767	Wedge 4 x 2 Right	1	1	N	N	0	N	
+P	43721	Wedge 4 x 2 Sloped Left	1	11	N	N	0	N	
+P	43720	Wedge 4 x 2 Sloped Right	1	11	N	N	0	N	
+P	2450	Wedge, Plate 3 x 3 Cut Corner	2	1	N	N	0	N	
+P	2419	Wedge, Plate 3 x 6 Cut Corners	2	85	N	N	0	N	
+P	41770	Wedge, Plate 4 x 2 Left	6	1	N	N	0	N	
+P	41770	Wedge, Plate 4 x 2 Left	2	85	N	N	0	N	
+P	41770	Wedge, Plate 4 x 2 Left	4	11	N	N	0	N	
+P	41769	Wedge, Plate 4 x 2 Right	6	1	N	N	0	N	
+P	41769	Wedge, Plate 4 x 2 Right	2	85	N	N	0	N	
+P	41769	Wedge, Plate 4 x 2 Right	4	11	N	N	0	N	
+P	30355	Wedge, Plate 6 x 12 Left	2	86	N	N	0	N	
+P	30356	Wedge, Plate 6 x 12 Right	2	86	N	N	0	N	
+P	54384	Wedge, Plate 6 x 3 Left	1	1	N	N	0	N	
+P	54383	Wedge, Plate 6 x 3 Right	1	1	N	N	0	N	
+P	55982	Wheel 18mm D. x 14mm with Axle Hole, Fake Bolts and Shallow Spokes	13	11	N	N	0	N	
+M	sr008	Speed Racer, White Racing Coveralls	1	0	N	N	0	N	
+M	sr009	Gray Ghost	1	0	N	N	0	N	
+M	sr010	Cannonball Taylor	1	0	N	N	0	N	
+M	sr011	Pops Racer	1	0	N	N	0	N	
+M	sr012	Spritle	1	0	N	N	0	N	
+M	sr013	Trixie	1	0	N	N	0	N	
+M	sr014	Commentator	1	0	N	N	0	N	
+P	8161stk01	Sticker for Set 8161 - Sheet 1 (63591/4529252)	1	0	N	N	0	N	
+P	8161stk02	Sticker for Set 8161 - Sheet 2 (63086/4527349)	1	0	N	N	0	N	
+P	61073	Technic, Panel Car Spoiler 3 x 8 with Three Holes	2	11	N	N	0	N	
+P	30540	Hinge Brick 1 x 2 Locking with 2 Fingers Horizontal End	4	11	N	N	0	N	
+P	44301	Hinge Plate 1 x 2 Locking with 1 Finger On End	4	11	N	N	0	N	
+P	4589b	Cone 1 x 1 with Top Groove	2	85	N	Y	1	N	
+P	4532a	Container, Cupboard 2 x 3 x 2 - Solid Studs	1	5	N	Y	2	N	
+P	55982c02	Wheel 18mm D. x 14mm with Axle Hole, Fake Bolts and Shallow Spokes, with Black Tire 24 x 14 Shallow Tread (Tread Small Hub) (55982 / 30648)	13	11	N	N	0	Y	
+P	4032b	Plate, Round 2 x 2 with Axle Hole - New Style with X Opening	2	86	N	Y	3	N	
+P	54200	Slope 30 1 x 1 x 2/3	1	3	Y	N	0	N	
+P	54200	Slope 30 1 x 1 x 2/3	1	1	Y	N	0	N	
+P	54200	Slope 30 1 x 1 x 2/3	1	85	Y	N	0	N	
+P	54200	Slope 30 1 x 1 x 2/3	2	11	Y	N	0	N	
+P	2780	Technic, Pin with Friction Ridges Lengthwise WITH Center Slots	1	11	Y	N	0	N	
+P	3830	Hinge Brick 1 x 4 Swivel Top	4	1	N	N	0	N	
+P	3831	Hinge Brick 1 x 4 Swivel Base	4	1	N	N	0	N	
+P	3069bpb147	Tile 1 x 2 with White Minifig Racer and 'LIVE' Pattern (Sticker) - Set 8161	4	85	N	N	0	Y	
+P	3069bpb150	Tile 1 x 2 with Dark Blue and Gray Swirl Pattern #1 (Sticker) - Set 8161	1	85	N	N	0	Y	
+P	3069bpb149	Tile 1 x 2 with Dark Blue and Gray Swirl Pattern #3 (Sticker) - Set 8161	1	85	N	N	0	Y	
+P	3069bpb148	Tile 1 x 2 with Dark Blue and Gray Swirl Pattern #2 (Sticker) - Set 8161	1	85	N	N	0	Y	
+P	2335pb067	Flag 2 x 2 Square with Checkered Blue and White Pattern on Both Sides (Stickers) - Set 8161	4	1	N	N	0	Y	
+P	2454pb040	Brick 1 x 2 x 5 with Black Cyrillic Characters and Checkered Flag on Red Background Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	2454pb039	Brick 1 x 2 x 5 with Purple Paint and Lime Symbols on White Background Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	2454pb038	Brick 1 x 2 x 5 with Purple Stylized Bird on Lime Background Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	2454pb037	Brick 1 x 2 x 5 with 3 Red Asian Characters on Yellow Splash and Blue Background Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	2454pb036	Brick 1 x 2 x 5 with Half Dark Gray Phoenix and Small Red Phoenix Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	2454pb035	Brick 1 x 2 x 5 with Blue Asian Characters on White Background Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	2454pb034	Brick 1 x 2 x 5 with White Cyrillic Characters on Red and Black Background Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	61073pb02	Technic, Panel Car Spoiler 3 x 8 with Three Holes and Four Stadium Lights Pattern (Stickers) - Set 8161	2	11	N	N	0	Y	
+P	50746pb23	Slope 30 1 x 1 x 2/3 with Gray Drop Pattern (Sticker) - Set 8161	8	3	N	N	0	Y	
+P	4515pb36	Slope 10 6 x 8 with White Minifig Racer and 'LIVE' Pattern (Sticker) - Set 8161	1	86	N	N	0	Y	
+P	2454pb043	Brick 1 x 2 x 5 with Black Cyrillic Characters Outlined in Yellow on Red Background Pattern (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	59349pb029	Panel 1 x 6 x 5 with Tools Pattern #1 on Inside (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	59349pb030	Panel 1 x 6 x 5 with Tools Pattern #2 on Inside (Sticker) - Set 8161	1	1	N	N	0	Y	
+P	43712pb27	Wedge 6 x 4 Triple Curved with Red "V" Pattern (Stickers) - Set 8161	1	1	N	N	0	Y	
