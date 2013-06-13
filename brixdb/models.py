@@ -1,5 +1,11 @@
 from django.conf import settings
 from django.db import models
+from django.utils.translation import ugettext_lazy as _
+
+from model_utils import Choices
+from model_utils.managers import PassThroughManager
+
+from .managers import SetQuerySet, PartQuerySet
 
 
 class Category(models.Model):
@@ -11,22 +17,50 @@ class Category(models.Model):
         return self.name 
 
 
-class Set(models.Model):
+class CatalogItem(models.Model):
+    TYPE = Choices((1, 'set', _('Set')), (2, 'part', _('Part')), (3, 'minifig', _('Minifig')))
+
     category = models.ForeignKey(Category)
+    item_type = models.PositiveIntegerField(default=TYPE.part, choices=TYPE, db_index=True)
     name = models.CharField(max_length=256)
     number = models.CharField(max_length=32)
     no_inventory = models.BooleanField(default=False)
+    year_released = models.PositiveIntegerField(default=0)
+    bl_id = models.PositiveIntegerField(default=0)
+    ldraw_name = models.CharField(max_length=256, blank=True, default='')
+    tlg_name = models.CharField(max_length=256, blank=True, default='')
+
+    def __unicode__(self):
+        return self.name
+
+    def import_inventory(self):
+        from .utils import import_bricklink_inventory, fetch_bricklink_inventory
+        import_bricklink_inventory(self, fetch_bricklink_inventory(self))
+
+
+class Set(CatalogItem):
+    objects = PassThroughManager.for_queryset_class(SetQuerySet)()
+
+    class Meta:
+        proxy = True
+        ordering = ('number',)
 
     def __unicode__(self):
         return '%s %s' % (self.number, self.name)
 
 
-class Part(models.Model):
-    category = models.ForeignKey(Category)
-    number = models.CharField(max_length=64)
-    name = models.CharField(max_length=256)
-    ldraw_name = models.CharField(max_length=256, blank=True, default='')
-    tlg_name = models.CharField(max_length=256, blank=True, default='')
+class Part(CatalogItem):
+    objects = PassThroughManager.for_queryset_class(PartQuerySet)()
+
+    class Meta:
+        proxy = True
+        ordering = ('name',)
+        
+
+class Minifig(CatalogItem):
+    class Meta:
+        proxy = True
+        ordering = ('name',)
 
 
 class Colour(models.Model):
@@ -47,17 +81,20 @@ class Element(models.Model):
     colour = models.ForeignKey(Colour, related_name='elements')
     lego_id = models.PositiveIntegerField(blank=True, null=True)
 
+    def __unicode__(self):
+        return '%s %s' % (self.colour, self.part)
+
     @property
     def lookup_key(self):
         return '%s_%d' % (self.part.number, self.colour.number)
     
 
-class SetElement(models.Model):
+class ItemElement(models.Model):
     """
     
     """
-    in_set = models.ForeignKey(Set, related_name='inventory')
-    element = models.ForeignKey(Element)
+    item = models.ForeignKey(CatalogItem, related_name='inventory')
+    element = models.ForeignKey(Element, related_name='in_sets')
     amount = models.PositiveIntegerField(default=1)
     is_extra = models.BooleanField(default=False)
     is_counterpart = models.BooleanField(default=False)

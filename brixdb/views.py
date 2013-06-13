@@ -18,6 +18,10 @@ def part_index(request, number):
     return render(request, template, c)
 
 
+def colour_detail(request, colour_number):
+	pass
+
+
 @require_POST
 def add_set_owned(request, set_number):
     _set = get_object_or_404(Set, number=set_number)
