@@ -2,7 +2,7 @@ from django.conf import settings
 
 import requests
 
-from .models import Part, Category, Element, Set, Colour
+from .models import Part, Category, Element, Set, Colour, CatalogItem
 
 
 def fetch_bricklink_inventory(_set):
@@ -50,7 +50,7 @@ def import_bricklink_inventory(_set, dat):
             if not elem_key in _elements:
                 _elements[elem_key] = Element.objects.create(part=p, colour=_colours[colour])
             element = _elements[elem_key]
-            _set.inventory.create(element=element, amount=int(amount), is_extra=(extra=='Y'), is_alternate=(alternate == 'Y'), is_counterpart=(counter == 'Y'), match_id=int(match))
+            _set.inventory.create(element=element, amount=int(amount), is_extra=(extra == 'Y'), is_alternate=(alternate == 'Y'), is_counterpart=(counter == 'Y'), match_id=int(match))
 
 
 def import_bricklink_setlist(dat):
@@ -58,7 +58,12 @@ def import_bricklink_setlist(dat):
     Imports a set list downloaded from Bricklink
     """
     lines = [l.strip().split('\t') for l in dat.split('\n')][3:]
-    for category_id, category_name, set_number, set_name in lines:
+    for l in lines:
+        if not l or not l[0]:
+            continue
+        category_id, category_name, set_number, set_name = l[:4]
+        #if len(l) > 4:
+        #    TODO: weight, dimensions, year released
         category, created = Category.objects.get_or_create(bl_id=category_id, name=category_name)
         if created:
             category.save()
@@ -76,7 +81,11 @@ def import_bricklink_partslist(dat):
     Category ID	Category Name	Number	Name
     """
     lines = [l.strip().split('\t') for l in dat.split('\n')][3:]
-    for category_id, category_name, part_number, part_name in lines:
+    for l in lines:
+        if not l or not l[0]:
+            continue
+        category_id, category_name, part_number, part_name = l[:4]
+        # TODO: weight, year, etc
         category, created = Category.objects.get_or_create(bl_id=category_id, name=category_name)
         if created:
             category.save()
