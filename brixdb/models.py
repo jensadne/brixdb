@@ -5,7 +5,7 @@ from django.utils.translation import ugettext_lazy as _
 from model_utils import Choices
 from model_utils.managers import PassThroughManager
 
-from .managers import SetQuerySet, PartQuerySet
+from .managers import SetQuerySet, PartQuerySet, SetManager, PartManager
 
 
 class Category(models.Model):
@@ -30,6 +30,8 @@ class CatalogItem(models.Model):
     ldraw_name = models.CharField(max_length=256, blank=True, default='')
     tlg_name = models.CharField(max_length=256, blank=True, default='')
 
+    all_objects = models.Manager()
+
     def __unicode__(self):
         return self.name
 
@@ -39,7 +41,7 @@ class CatalogItem(models.Model):
 
 
 class Set(CatalogItem):
-    objects = PassThroughManager.for_queryset_class(SetQuerySet)()
+    objects = SetManager()#PassThroughManager.for_queryset_class(SetQuerySet)()
 
     class Meta:
         proxy = True
@@ -48,14 +50,22 @@ class Set(CatalogItem):
     def __unicode__(self):
         return '%s %s' % (self.number, self.name)
 
+    def save(self, *args, **kwargs):
+        self.item_type = self.TYPE.set
+        super(Set, self).save(*args, **kwargs)
+
 
 class Part(CatalogItem):
-    objects = PassThroughManager.for_queryset_class(PartQuerySet)()
+    objects = PartManager()#PassThroughManager.for_queryset_class(PartQuerySet)()
 
     class Meta:
         proxy = True
         ordering = ('name',)
-        
+
+    def save(self, *args, **kwargs):
+        self.item_type = self.TYPE.part
+        super(Part, self).save(*args, **kwargs)
+
 
 class Minifig(CatalogItem):
     class Meta:
