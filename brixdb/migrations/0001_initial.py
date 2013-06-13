@@ -11,63 +11,67 @@ class Migration(SchemaMigration):
         # Adding model 'Category'
         db.create_table(u'brixdb_category', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('parent', self.gf('django.db.models.fields.related.ForeignKey')(blank=True, related_name='sub_categories', null=True, to=orm['brixdb.Category'])),
+            ('bl_id', self.gf('django.db.models.fields.PositiveIntegerField')()),
             ('name', self.gf('django.db.models.fields.CharField')(max_length=256)),
         ))
         db.send_create_signal(u'brixdb', ['Category'])
 
-        # Adding model 'Set'
-        db.create_table(u'brixdb_set', (
+        # Adding model 'CatalogItem'
+        db.create_table(u'brixdb_catalogitem', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('category', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['brixdb.Category'])),
+            ('item_type', self.gf('django.db.models.fields.PositiveIntegerField')(default=2, db_index=True)),
             ('name', self.gf('django.db.models.fields.CharField')(max_length=256)),
+            ('number', self.gf('django.db.models.fields.CharField')(max_length=32)),
+            ('no_inventory', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('year_released', self.gf('django.db.models.fields.PositiveIntegerField')(default=0)),
+            ('bl_id', self.gf('django.db.models.fields.PositiveIntegerField')(default=0)),
+            ('ldraw_name', self.gf('django.db.models.fields.CharField')(default='', max_length=256, blank=True)),
+            ('tlg_name', self.gf('django.db.models.fields.CharField')(default='', max_length=256, blank=True)),
         ))
-        db.send_create_signal(u'brixdb', ['Set'])
-
-        # Adding model 'Part'
-        db.create_table(u'brixdb_part', (
-            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('name', self.gf('django.db.models.fields.CharField')(max_length=256)),
-        ))
-        db.send_create_signal(u'brixdb', ['Part'])
+        db.send_create_signal(u'brixdb', ['CatalogItem'])
 
         # Adding model 'Colour'
         db.create_table(u'brixdb_colour', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
             ('name', self.gf('django.db.models.fields.CharField')(max_length=256)),
-            ('number', self.gf('django.db.models.fields.CharField')(max_length=128)),
-            ('tlg_name', self.gf('django.db.models.fields.CharField')(max_length=256)),
-            ('tlg_number', self.gf('django.db.models.fields.CharField')(max_length=256)),
-            ('ldraw_name', self.gf('django.db.models.fields.CharField')(max_length=256)),
-            ('ldraw_number', self.gf('django.db.models.fields.CharField')(max_length=128)),
+            ('number', self.gf('django.db.models.fields.PositiveIntegerField')()),
+            ('tlg_name', self.gf('django.db.models.fields.CharField')(default='', max_length=256, blank=True)),
+            ('tlg_number', self.gf('django.db.models.fields.PositiveIntegerField')(null=True, blank=True)),
+            ('ldraw_name', self.gf('django.db.models.fields.CharField')(default='', max_length=256, blank=True)),
+            ('ldraw_number', self.gf('django.db.models.fields.PositiveIntegerField')(null=True, blank=True)),
         ))
         db.send_create_signal(u'brixdb', ['Colour'])
 
         # Adding model 'Element'
         db.create_table(u'brixdb_element', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('part', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['brixdb.Part'])),
-            ('colour', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['brixdb.Colour'])),
+            ('part', self.gf('django.db.models.fields.related.ForeignKey')(related_name='elements', to=orm['brixdb.CatalogItem'])),
+            ('colour', self.gf('django.db.models.fields.related.ForeignKey')(related_name='elements', to=orm['brixdb.Colour'])),
             ('lego_id', self.gf('django.db.models.fields.PositiveIntegerField')(null=True, blank=True)),
         ))
         db.send_create_signal(u'brixdb', ['Element'])
 
-        # Adding model 'SetElement'
-        db.create_table(u'brixdb_setelement', (
+        # Adding model 'ItemElement'
+        db.create_table(u'brixdb_itemelement', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('in_set', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['brixdb.Set'])),
-            ('element', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['brixdb.Element'])),
+            ('item', self.gf('django.db.models.fields.related.ForeignKey')(related_name='inventory', to=orm['brixdb.CatalogItem'])),
+            ('element', self.gf('django.db.models.fields.related.ForeignKey')(related_name='in_sets', to=orm['brixdb.Element'])),
             ('amount', self.gf('django.db.models.fields.PositiveIntegerField')(default=1)),
             ('is_extra', self.gf('django.db.models.fields.BooleanField')(default=False)),
             ('is_counterpart', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('is_alternate', self.gf('django.db.models.fields.BooleanField')(default=False)),
+            ('match_id', self.gf('django.db.models.fields.PositiveIntegerField')(default=0, blank=True)),
         ))
-        db.send_create_signal(u'brixdb', ['SetElement'])
+        db.send_create_signal(u'brixdb', ['ItemElement'])
 
         # Adding model 'SetOwned'
         db.create_table(u'brixdb_setowned', (
             (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
-            ('owned_set', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['brixdb.Set'])),
-            ('owner', self.gf('django.db.models.fields.related.ForeignKey')(to=orm['auth.User'])),
-            ('number', self.gf('django.db.models.fields.PositiveIntegerField')(default=1)),
+            ('owned_set', self.gf('django.db.models.fields.related.ForeignKey')(related_name='owners', to=orm['brixdb.CatalogItem'])),
+            ('owner', self.gf('django.db.models.fields.related.ForeignKey')(related_name='sets_owned', to=orm['auth.User'])),
+            ('amount', self.gf('django.db.models.fields.PositiveIntegerField')(default=1)),
         ))
         db.send_create_signal(u'brixdb', ['SetOwned'])
 
@@ -76,11 +80,8 @@ class Migration(SchemaMigration):
         # Deleting model 'Category'
         db.delete_table(u'brixdb_category')
 
-        # Deleting model 'Set'
-        db.delete_table(u'brixdb_set')
-
-        # Deleting model 'Part'
-        db.delete_table(u'brixdb_part')
+        # Deleting model 'CatalogItem'
+        db.delete_table(u'brixdb_catalogitem')
 
         # Deleting model 'Colour'
         db.delete_table(u'brixdb_colour')
@@ -88,8 +89,8 @@ class Migration(SchemaMigration):
         # Deleting model 'Element'
         db.delete_table(u'brixdb_element')
 
-        # Deleting model 'SetElement'
-        db.delete_table(u'brixdb_setelement')
+        # Deleting model 'ItemElement'
+        db.delete_table(u'brixdb_itemelement')
 
         # Deleting model 'SetOwned'
         db.delete_table(u'brixdb_setowned')
@@ -125,54 +126,60 @@ class Migration(SchemaMigration):
             'user_permissions': ('django.db.models.fields.related.ManyToManyField', [], {'to': u"orm['auth.Permission']", 'symmetrical': 'False', 'blank': 'True'}),
             'username': ('django.db.models.fields.CharField', [], {'unique': 'True', 'max_length': '30'})
         },
+        u'brixdb.catalogitem': {
+            'Meta': {'object_name': 'CatalogItem'},
+            'bl_id': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0'}),
+            'category': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['brixdb.Category']"}),
+            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'item_type': ('django.db.models.fields.PositiveIntegerField', [], {'default': '2', 'db_index': 'True'}),
+            'ldraw_name': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '256', 'blank': 'True'}),
+            'name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
+            'no_inventory': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'number': ('django.db.models.fields.CharField', [], {'max_length': '32'}),
+            'tlg_name': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '256', 'blank': 'True'}),
+            'year_released': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0'})
+        },
         u'brixdb.category': {
             'Meta': {'object_name': 'Category'},
+            'bl_id': ('django.db.models.fields.PositiveIntegerField', [], {}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '256'})
+            'name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
+            'parent': ('django.db.models.fields.related.ForeignKey', [], {'blank': 'True', 'related_name': "'sub_categories'", 'null': 'True', 'to': u"orm['brixdb.Category']"})
         },
         u'brixdb.colour': {
             'Meta': {'object_name': 'Colour'},
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'ldraw_name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
-            'ldraw_number': ('django.db.models.fields.CharField', [], {'max_length': '128'}),
+            'ldraw_name': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '256', 'blank': 'True'}),
+            'ldraw_number': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
-            'number': ('django.db.models.fields.CharField', [], {'max_length': '128'}),
-            'tlg_name': ('django.db.models.fields.CharField', [], {'max_length': '256'}),
-            'tlg_number': ('django.db.models.fields.CharField', [], {'max_length': '256'})
+            'number': ('django.db.models.fields.PositiveIntegerField', [], {}),
+            'tlg_name': ('django.db.models.fields.CharField', [], {'default': "''", 'max_length': '256', 'blank': 'True'}),
+            'tlg_number': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'})
         },
         u'brixdb.element': {
             'Meta': {'object_name': 'Element'},
-            'colour': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['brixdb.Colour']"}),
+            'colour': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'elements'", 'to': u"orm['brixdb.Colour']"}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
             'lego_id': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True', 'blank': 'True'}),
-            'part': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['brixdb.Part']"})
+            'part': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'elements'", 'to': u"orm['brixdb.CatalogItem']"})
         },
-        u'brixdb.part': {
-            'Meta': {'object_name': 'Part'},
-            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '256'})
-        },
-        u'brixdb.set': {
-            'Meta': {'object_name': 'Set'},
-            'category': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['brixdb.Category']"}),
-            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'name': ('django.db.models.fields.CharField', [], {'max_length': '256'})
-        },
-        u'brixdb.setelement': {
-            'Meta': {'object_name': 'SetElement'},
+        u'brixdb.itemelement': {
+            'Meta': {'object_name': 'ItemElement'},
             'amount': ('django.db.models.fields.PositiveIntegerField', [], {'default': '1'}),
-            'element': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['brixdb.Element']"}),
+            'element': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'in_sets'", 'to': u"orm['brixdb.Element']"}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'in_set': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['brixdb.Set']"}),
+            'is_alternate': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
             'is_counterpart': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
-            'is_extra': ('django.db.models.fields.BooleanField', [], {'default': 'False'})
+            'is_extra': ('django.db.models.fields.BooleanField', [], {'default': 'False'}),
+            'item': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'inventory'", 'to': u"orm['brixdb.CatalogItem']"}),
+            'match_id': ('django.db.models.fields.PositiveIntegerField', [], {'default': '0', 'blank': 'True'})
         },
         u'brixdb.setowned': {
             'Meta': {'object_name': 'SetOwned'},
+            'amount': ('django.db.models.fields.PositiveIntegerField', [], {'default': '1'}),
             u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
-            'number': ('django.db.models.fields.PositiveIntegerField', [], {'default': '1'}),
-            'owned_set': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['brixdb.Set']"}),
-            'owner': ('django.db.models.fields.related.ForeignKey', [], {'to': u"orm['auth.User']"})
+            'owned_set': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'owners'", 'to': u"orm['brixdb.CatalogItem']"}),
+            'owner': ('django.db.models.fields.related.ForeignKey', [], {'related_name': "'sets_owned'", 'to': u"orm['auth.User']"})
         },
         u'contenttypes.contenttype': {
             'Meta': {'ordering': "('name',)", 'unique_together': "(('app_label', 'model'),)", 'object_name': 'ContentType', 'db_table': "'django_content_type'"},
