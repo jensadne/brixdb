@@ -10,6 +10,6 @@ admin.autodiscover()
 urlpatterns = patterns('',
     url(r'^$', TemplateView.as_view(template_name='frontpage.html'), name='main-index'),
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^.*', include('brixdb.urls')),
+    url(r'', include('brixdb.urls')),
 
 ) + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

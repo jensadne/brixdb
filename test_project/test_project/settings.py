@@ -16,13 +16,12 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(__file__))
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': os.path.join(PROJECT_ROOT, 'brix.db'),                      # Or path to database file if using sqlite3.
-        # The following settings are not used with sqlite3:
+        'ENGINE': 'django.db.backends.postgresql_psycopg2', 
+        'NAME': 'brixdb',                     
         'USER': '',
         'PASSWORD': '',
-        'HOST': '',                      # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
-        'PORT': '',                      # Set to empty string for default.
+        'HOST': '',                      
+        'PORT': '',                      
     }
 }
 
@@ -131,10 +130,12 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'brixdb',
     'debug_toolbar',
     'django_extensions',
     'south',
+
+    'brixdb',
+    'test_project',
 )
 
 # A sample logging configuration. The only tangible logging

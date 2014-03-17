@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.template.defaultfilters import slugify
 from django.utils.translation import ugettext_lazy as _
 
 from model_utils import Choices
@@ -18,7 +19,7 @@ class Category(models.Model):
 
 
 class CatalogItem(models.Model):
-    TYPE = Choices((1, 'set', _('Set')), (2, 'part', _('Part')), (3, 'minifig', _('Minifig')))
+    TYPE = Choices((1, 'set', _('Set')), (2, 'part', _('Part')), (3, 'minifig', _('Minifig')), (4, 'gear', _("Gear")))
 
     category = models.ForeignKey(Category)
     item_type = models.PositiveIntegerField(default=TYPE.part, choices=TYPE, db_index=True)
@@ -76,6 +77,7 @@ class Minifig(CatalogItem):
 class Colour(models.Model):
     name = models.CharField(max_length=256)
     number = models.PositiveIntegerField()
+    slug = models.SlugField(default='', max_length=32)
 
     tlg_name = models.CharField(max_length=256, blank=True, default='')
     tlg_number = models.PositiveIntegerField(blank=True, null=True)
@@ -84,6 +86,10 @@ class Colour(models.Model):
 
     def __unicode__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        self.slug = slugify(self.name)
+        super(Colour, self).save(*args, **kwargs)
 
 
 class Element(models.Model):
@@ -101,7 +107,7 @@ class Element(models.Model):
 
 class ItemElement(models.Model):
     """
-    
+    An Element that's part of an Item (Set, Part, etc) 
     """
     item = models.ForeignKey(CatalogItem, related_name='inventory')
     element = models.ForeignKey(Element, related_name='in_sets')
@@ -116,4 +122,4 @@ class SetOwned(models.Model):
     owned_set = models.ForeignKey(Set, related_name='owners')
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sets_owned')
     amount = models.PositiveIntegerField(default=1)
-
+    # XXX: state ? (parted out, MISB, deboxed, other?)

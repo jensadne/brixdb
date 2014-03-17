@@ -4,9 +4,11 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext as _
+from django.views.generic.detail import DetailView
 from django.views.decorators.http import require_POST
 
-from brixdb.forms import SimpleIntegerForm
+from .forms import SimpleIntegerForm
+from .models import Colour, ItemElement, Set
 
 
 def render_json(request, context):
@@ -18,8 +20,19 @@ def part_index(request, number):
     return render(request, template, c)
 
 
-def colour_detail(request, colour_number):
-	pass
+class ColourDetail(DetailView):
+    template_name = 'brixdb/colour_detail.html'
+    model = Colour
+
+    def get_context_data(self, object):
+        context = super(ColourDetail, self).get_context_data()
+        #context['colour'] = colour = get_object_or_404(Colour, slug=self.kwargs['slug'])
+        if self.request.user.is_authenticated():
+            context['owned_parts'] = ItemElement.objects.filter(element__colour=object,
+                                            item__in=self.request.user.sets_owned.values_list('owned_set', flat=True)
+                                            ).select_related('element', 'element__part', 'item'
+                                            ).order_by('element__part__name')
+        return context
 
 
 @require_POST

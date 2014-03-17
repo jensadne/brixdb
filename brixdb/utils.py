@@ -1,15 +1,18 @@
 from django.conf import settings
 
+from bricklink import ApiClient
 import requests
 
 from .models import Part, Category, Element, Set, Colour, CatalogItem
 
 
 def fetch_bricklink_inventory(_set):
+    inv_types = {1: 'S', 4: 'G'}
     url = 'http://www.bricklink.com/catalogDownload.asp?a=a'
-    dat = requests.post(url, data={'itemNo': _set.number, 'viewType': '4', 'downloadType': 'T', 'itemTypeInv': 'S'}, headers={'referrer': url}).text
+    dat = requests.post(url, data={'itemNo': _set.number, 'viewType': '4', 'downloadType': 'T', 
+                                   'itemTypeInv': inv_types[_set.item_type]}, headers={'referrer': url}).text
     orgfil = open('%sset_inventories/%s.txt' % (settings.MEDIA_ROOT, _set.number), 'wb')
-    orgfil.write(dat)
+    orgfil.write(dat.encode('utf8'))
     orgfil.close()
     return dat 
 
