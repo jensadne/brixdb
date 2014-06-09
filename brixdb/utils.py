@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 
 from bricklink import ApiClient
@@ -114,6 +116,12 @@ def import_bricklink_colours(dat):
             colour.save()
 
 
+# def 
+
+
+order_number_re = re.compile(r'^Subject:( )*Bricklink Order #(\d+)', re.IGNORECASE)
+part_content_re = re.compile(r'^\[(?P<state>New|Used)\] (?P<part_info>.*) \(x(?P<quantity>\d+)\)')
+
 def import_bricklink_order(owner, dat):
     """
     Parses an order confirmation email from Bricklink and imports it as a "Set"
@@ -122,5 +130,58 @@ def import_bricklink_order(owner, dat):
     cat, created = Category.objects.get_or_create(name='__Bricklink order', bl_id=9999)
     if created:
         cat.save()
-    s = Set(name='Bricklink order #%d' % order_number, category=cat, 
-            number='blorder%d' % order_number)
+
+    lines = dat.split('\n')
+    # find order number
+    order_number = None
+    for line in lines:
+        line_match = order_number_re.match(line)
+        if line_match:
+            order_number = int(line_match.groups()[1])
+            break
+    if not order_number:
+        return False, 'invalid data, no order number'
+
+    set_ = Set.objects.create(name='Bricklink order #%d' % order_number, category=cat,
+                              number='__blorder%d' % order_number)
+    owner.sets_owned.create(owned_set=set_)
+    # XXX: store price of order?
+
+    # find start and end of order contents
+    content_start, content_end = None, None
+    for i, line in enumerate(lines):
+        if line.startswith('Items in Order:'):
+            content_start = i + 2
+        if line.startswith('Buyer Information:'):
+            content_end = i - 2
+
+    colours = {}
+    for colour in Colour.objects.all():
+        colours[colour.name] = colour
+    def find_colour_part(part_info):
+        parts = part_info.split(' ')
+        colour, part = '', ''
+        for i, p in enumerate(parts):
+            colour += '%s%s' % (' ' if colour else '', p)
+            if colour in colours:
+                return colours[colour], ' '.join(parts[i+1:]).strip()
+        return None, None
+
+    # see what the order actually contains
+    for line in lines[content_start:content_end]:
+        content_match = part_content_re.match(line)
+        if content_match:
+            groups = content_match.groupdict()
+            state, part_info, quantity = groups['state'], groups['part_info'], int(groups['quantity']) 
+            colour, part_name = find_colour_part(part_info)
+            try:
+                part = Part.objects.get(name=part_name)
+            except Part.DoesNotExist:
+                print 'NOT FOUND', part_name
+            #print colour, part
+            elem, created = Element.objects.get_or_create(part=part, colour=colour)
+            if created:
+                elem.save()
+            set_.inventory.create(element=elem, amount=quantity)
+
+    return True, set_

@@ -21,7 +21,7 @@ class Category(models.Model):
 class CatalogItem(models.Model):
     TYPE = Choices((1, 'set', _('Set')), (2, 'part', _('Part')), (3, 'minifig', _('Minifig')), (4, 'gear', _("Gear")))
 
-    category = models.ForeignKey(Category)
+    category = models.ForeignKey(Category, related_name='items')
     item_type = models.PositiveIntegerField(default=TYPE.part, choices=TYPE, db_index=True)
     name = models.CharField(max_length=256)
     number = models.CharField(max_length=32)
@@ -116,6 +116,9 @@ class ItemElement(models.Model):
     is_counterpart = models.BooleanField(default=False)
     is_alternate = models.BooleanField(default=False)
     match_id = models.PositiveIntegerField(blank=True, default=0)
+
+    def __unicode__(self):
+        return '%dx %s' % (self.amount, self.element)
 
     
 class SetOwned(models.Model):
