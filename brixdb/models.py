@@ -1,12 +1,15 @@
+from __future__ import unicode_literals, absolute_import
+
 from django.conf import settings
 from django.db import models
 from django.template.defaultfilters import slugify
-from django.utils.translation import ugettext_lazy as _
+from django.utils.translation import ugettext, ugettext_lazy as _
 
 from model_utils import Choices
-from model_utils.managers import PassThroughManager
+#from model_utils.managers import PassThroughManager
 
-from .managers import SetQuerySet, PartQuerySet, SetManager, PartManager
+#from .managers import SetQuerySet, PartQuerySet
+from .managers import SetManager, PartManager
 
 
 class Category(models.Model):
@@ -93,9 +96,14 @@ class Colour(models.Model):
 
 
 class Element(models.Model):
+    """
+    An Element is a Part in a given Colour. Due to TLG's ID numbers for
+    elements changing when elements are reactivated with same mold we need a
+    list of some kind for those since we don't differentiate between them.
+    """
     part = models.ForeignKey(Part, related_name='elements')
     colour = models.ForeignKey(Colour, related_name='elements')
-    lego_id = models.PositiveIntegerField(blank=True, null=True)
+    #lego_id = models.PositiveIntegerField(blank=True, null=True)
 
     def __unicode__(self):
         return '%s %s' % (self.colour, self.part)
@@ -126,3 +134,7 @@ class SetOwned(models.Model):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sets_owned')
     amount = models.PositiveIntegerField(default=1)
     # XXX: state ? (parted out, MISB, deboxed, other?)
+
+    def __unicode__(self):
+        dic = {'number': self.amount, 'name': self.owned_set.name, 'owner': self.user.username}
+        return ugettext('%(number)s x %(name) owned by %(owner)s') % dic

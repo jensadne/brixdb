@@ -2,10 +2,10 @@ import re
 
 from django.conf import settings
 
-from bricklink import ApiClient
+#from bricklink import ApiClient
 import requests
 
-from .models import Part, Category, Element, Set, Colour, CatalogItem
+from .models import Part, Category, Element, Set, Colour#, CatalogItem
 
 
 def fetch_bricklink_inventory(_set):
@@ -121,6 +121,7 @@ def import_bricklink_colours(dat):
 
 order_number_re = re.compile(r'^Subject:( )*Bricklink Order #(\d+)', re.IGNORECASE)
 part_content_re = re.compile(r'^\[(?P<state>New|Used)\] (?P<part_info>.*) \(x(?P<quantity>\d+)\)')
+
 
 def import_bricklink_order(owner, dat):
     """
