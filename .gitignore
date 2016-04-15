@@ -1,3 +1,6 @@
 *.pyc
 *.swp
 docs/_*
+*.swo
+/test_project/bricklink
+/test_project/brixdb

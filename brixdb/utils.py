@@ -39,7 +39,7 @@ def import_bricklink_inventory(_set, dat):
     # Type	Item No	Item Name	Qty	Color ID	Extra?	Alternate?	Match ID	Counterpart?
     lines = [l.strip().split('\t') for l in dat.split('\n')][2:]
     for l in lines:
-        if not l or not l[0]:
+        if not l or not l[0] or len(l) == 1:
             continue
         item_type, item_number, item_name, amount, colour, extra, alternate, match, counter = l
         if item_type == 'P':
@@ -55,7 +55,9 @@ def import_bricklink_inventory(_set, dat):
             if not elem_key in _elements:
                 _elements[elem_key] = Element.objects.create(part=p, colour=_colours[colour])
             element = _elements[elem_key]
-            _set.inventory.create(element=element, amount=int(amount), is_extra=(extra == 'Y'), is_alternate=(alternate == 'Y'), is_counterpart=(counter == 'Y'), match_id=int(match))
+            _set.inventory.create(element=element, amount=int(amount), is_extra=(extra == 'Y'),
+                                  is_alternate=(alternate == 'Y'), is_counterpart=(counter == 'Y'),
+                                  match_id=int(match))
 
 
 def import_bricklink_setlist(dat):
@@ -116,22 +118,22 @@ def import_bricklink_colours(dat):
             colour.save()
 
 
-# def 
-
-
 order_number_re = re.compile(r'^Subject:( )*Bricklink Order #(\d+)', re.IGNORECASE)
-part_content_re = re.compile(r'^\[(?P<state>New|Used)\] (?P<part_info>.*) \(x(?P<quantity>\d+)\)')
+part_content_re = re.compile(r'^\[(?P<state>New|Used)\] (?P<part_name>.*)  \(x(?P<quantity>\d+)\)')
+set_content_re = re.compile(r'^\[(?P<state>New|Used) (?P<state2>Sealed|Complete|Incomplete)\] (?P<set_number>\d+)  \(x(?P<quantity>\d+)\)')  # noqa
+
+def is_set(line):
+    return set_content_re.match(line)
 
 
-def import_bricklink_order(owner, dat):
+def is_part(line):
+    return part_content_re.match(line)
+
+
+def parse_bricklink_order(dat):
     """
-    Parses an order confirmation email from Bricklink and imports it as a "Set"
-    owned by "owner"
+    Parses an order confirmation email from Bricklink.
     """
-    cat, created = Category.objects.get_or_create(name='__Bricklink order', bl_id=9999)
-    if created:
-        cat.save()
-
     lines = dat.split('\n')
     # find order number
     order_number = None
@@ -141,12 +143,9 @@ def import_bricklink_order(owner, dat):
             order_number = int(line_match.groups()[1])
             break
     if not order_number:
-        return False, 'invalid data, no order number'
+            return False, 'invalid data, no order number'
 
-    set_ = Set.objects.create(name='Bricklink order #%d' % order_number, category=cat,
-                              number='__blorder%d' % order_number)
-    owner.sets_owned.create(owned_set=set_)
-    # XXX: store price of order?
+    sets, parts = [], []
 
     # find start and end of order contents
     content_start, content_end = None, None
@@ -156,17 +155,12 @@ def import_bricklink_order(owner, dat):
         if line.startswith('Buyer Information:'):
             content_end = i - 2
 
+    if content_start is None or content_end is None:
+        return False, 'invalid data, content not found'
+
     colours = {}
     for colour in Colour.objects.all():
         colours[colour.name] = colour
-    def find_colour_part(part_info):
-        parts = part_info.split(' ')
-        colour, part = '', ''
-        for i, p in enumerate(parts):
-            colour += '%s%s' % (' ' if colour else '', p)
-            if colour in colours:
-                return colours[colour], ' '.join(parts[i+1:]).strip()
-        return None, None
 
     # see what the order actually contains
     for line in lines[content_start:content_end]:
@@ -179,10 +173,31 @@ def import_bricklink_order(owner, dat):
                 part = Part.objects.get(name=part_name)
             except Part.DoesNotExist:
                 print 'NOT FOUND', part_name
+                continue
             #print colour, part
             elem, created = Element.objects.get_or_create(part=part, colour=colour)
             if created:
                 elem.save()
-            set_.inventory.create(element=elem, amount=quantity)
+            parts.append(elem)
+
+
+    return {'number': number, 'parts': parts, 'sets': sets}
+
+
+def import_bricklink_order(owner, dat):
+    """
+    Parses an order confirmation email from Bricklink and imports it as a "Set"
+    owned by "owner"
+    """
+    cat, created = Category.objects.get_or_create(name='__Bricklink order', bl_id=9999)
+    if created:
+        cat.save()
+
+    set_ = Set.objects.create(name='Bricklink order #%d' % order_number, category=cat,
+                              number='__blorder%d' % order_number)
+    owner.sets_owned.create(owned_set=set_)
+    # XXX: store price of order?
+
+    set_.inventory.create(element=elem, amount=quantity)
 
     return True, set_

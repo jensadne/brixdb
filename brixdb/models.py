@@ -6,10 +6,10 @@ from django.template.defaultfilters import slugify
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from model_utils import Choices
-#from model_utils.managers import PassThroughManager
+from model_utils.managers import PassThroughManager
 
 #from .managers import SetQuerySet, PartQuerySet
-from .managers import SetManager, PartManager
+from .managers import SetManager, PartManager, ElementQuerySet
 
 
 class Category(models.Model):
@@ -105,6 +105,8 @@ class Element(models.Model):
     colour = models.ForeignKey(Colour, related_name='elements')
     #lego_id = models.PositiveIntegerField(blank=True, null=True)
 
+    objects = ElementQuerySet.as_manager()
+
     def __unicode__(self):
         return '%s %s' % (self.colour, self.part)
 
@@ -115,7 +117,7 @@ class Element(models.Model):
 
 class ItemElement(models.Model):
     """
-    An Element that's part of an Item (Set, Part, etc) 
+    An Element that's part of an Item (Set, Part, etc)
     """
     item = models.ForeignKey(CatalogItem, related_name='inventory')
     element = models.ForeignKey(Element, related_name='in_sets')
@@ -136,5 +138,5 @@ class SetOwned(models.Model):
     # XXX: state ? (parted out, MISB, deboxed, other?)
 
     def __unicode__(self):
-        dic = {'number': self.amount, 'name': self.owned_set.name, 'owner': self.user.username}
-        return ugettext('%(number)s x %(name) owned by %(owner)s') % dic
+        dic = {'number': self.amount, 'name': self.owned_set.name, 'owner': self.owner.username}
+        return ugettext('%(number)s x %(name)s owned by %(owner)s') % dic

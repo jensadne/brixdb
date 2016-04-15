@@ -132,7 +132,6 @@ INSTALLED_APPS = (
     # 'django.contrib.admindocs',
     'debug_toolbar',
     'django_extensions',
-    'south',
 
     'brixdb',
     'test_project',

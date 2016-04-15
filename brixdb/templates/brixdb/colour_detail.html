@@ -4,12 +4,10 @@
 <h2>{{ colour }}</h2>
 
 <table>
-{% for part in owned_parts %}
+{% for element in owned_parts %}
 <tr>
-	<td>{{ part.amount }}</td> 
-	<td>{{ part.element.part.number }}</td>
-	<td>{{ part.element.part.name }}</td>
-	<td>{{ part.item.number }} {{ part.item.name }}</td>
+	<td>{{ element.part.number }}</td>
+	<td>{{ element.part.name }}</td>
 </tr>
 {% endfor %}
 </table>
