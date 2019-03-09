@@ -1,29 +1,14 @@
+# -*- coding: utf-8 -*-
 from django.apps import apps
 from django.db.models.query import QuerySet
-
-#from django.db.models import Manager
-from model_utils.managers import PassThroughManager
 
 
 class SetQuerySet(QuerySet):
     pass
-    #def all(self, *args, **kwargs):
-    #    return super(SetQuerySet, self).all(*args, **kwargs).filter(item_type=self.model.TYPE.set)
-
-
-class SetManager(PassThroughManager):
-    def get_query_set(self, *args, **kwargs):
-        return super(SetManager, self).get_query_set(*args, **kwargs).filter(item_type=self.model.TYPE.set)
 
 
 class PartQuerySet(QuerySet):
-#    def all(self, *args, **kwargs):
     pass
-
-
-class PartManager(PassThroughManager):
-    def get_query_set(self, *args, **kwargs):
-        return super(PartManager, self).get_query_set(*args, **kwargs).filter(item_type=self.model.TYPE.part)
 
 
 class ElementQuerySet(QuerySet):
@@ -45,3 +30,7 @@ class ElementQuerySet(QuerySet):
 
     def by_colour(self, colour):
         return self.filter(colour=colour)
+
+
+class MinifigQuerySet(QuerySet):
+    pass

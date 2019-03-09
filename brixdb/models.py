@@ -1,57 +1,71 @@
+# -*- coding: utf-8 -*-
 from __future__ import unicode_literals, absolute_import
 
 from django.conf import settings
+from django.contrib.auth.models import AbstractBaseUser
+from django.contrib.postgres import fields as pgfields
 from django.db import models
 from django.template.defaultfilters import slugify
 from django.utils.translation import ugettext, ugettext_lazy as _
 
 from model_utils import Choices
-from model_utils.managers import PassThroughManager
 
-#from .managers import SetQuerySet, PartQuerySet
-from .managers import SetManager, PartManager, ElementQuerySet
+from polymorphic.models import PolymorphicModel
+
+from .managers import SetQuerySet, PartQuerySet, ElementQuerySet, MinifigQuerySet
+
+
+class User(AbstractBaseUser):
+    email = models.EmailField(verbose_name='email address', max_length=255, unique=True)
+    name = models.CharField(max_length=256, blank=True, default='')
+
+    USERNAME_FIELD = 'email'
+    EMAIL_FIELD = 'email'
+
+    def __str__(self):
+        return self.name if self.name else self.email.split('@')[0]
 
 
 class Category(models.Model):
-    parent = models.ForeignKey('self', related_name='sub_categories', blank=True, null=True)
+    parent = models.ForeignKey('self', related_name='sub_categories', blank=True, null=True, on_delete=models.CASCADE)
     bl_id = models.PositiveIntegerField()
     name = models.CharField(max_length=256)
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name 
 
 
-class CatalogItem(models.Model):
-    TYPE = Choices((1, 'set', _('Set')), (2, 'part', _('Part')), (3, 'minifig', _('Minifig')), (4, 'gear', _("Gear")))
-
-    category = models.ForeignKey(Category, related_name='items')
-    item_type = models.PositiveIntegerField(default=TYPE.part, choices=TYPE, db_index=True)
+class CatalogItem(PolymorphicModel):
+    TYPE = Choices(('set', _('Set')), ('part', _('Part')), ('minifig', _('Minifig')), ('gear', _("Gear")))
+    category = models.ForeignKey(Category, related_name='items', on_delete=models.CASCADE)
+    item_type = models.CharField(max_length=16, default=TYPE.part, choices=TYPE)
+    # name and number correspond to BL catalog for simplicity
     name = models.CharField(max_length=256)
     number = models.CharField(max_length=32)
     no_inventory = models.BooleanField(default=False)
     year_released = models.PositiveIntegerField(default=0)
     bl_id = models.PositiveIntegerField(default=0)
-    ldraw_name = models.CharField(max_length=256, blank=True, default='')
+
+    # most of TLG's names are horribly weird, but we'd like to keep track of them anyway
     tlg_name = models.CharField(max_length=256, blank=True, default='')
 
     all_objects = models.Manager()
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     def import_inventory(self):
-        from .utils import import_bricklink_inventory, fetch_bricklink_inventory
+        from .service.bricklink import import_bricklink_inventory, fetch_bricklink_inventory
         import_bricklink_inventory(self, fetch_bricklink_inventory(self))
 
 
 class Set(CatalogItem):
-    objects = SetManager()#PassThroughManager.for_queryset_class(SetQuerySet)()
+    objects = models.Manager.from_queryset(SetQuerySet)()
 
     class Meta:
-        proxy = True
         ordering = ('number',)
 
-    def __unicode__(self):
+    def __str__(self):
         return '%s %s' % (self.number, self.name)
 
     def save(self, *args, **kwargs):
@@ -60,7 +74,7 @@ class Set(CatalogItem):
 
 
 class Part(CatalogItem):
-    objects = PartManager()#PassThroughManager.for_queryset_class(PartQuerySet)()
+    objects = models.Manager.from_queryset(PartQuerySet)()
 
     class Meta:
         proxy = True
@@ -72,22 +86,28 @@ class Part(CatalogItem):
 
 
 class Minifig(CatalogItem):
+    objects = models.Manager.from_queryset(MinifigQuerySet)()
+
     class Meta:
         proxy = True
         ordering = ('name',)
+    
+    def save(self, *args, **kwargs):
+        self.item_type = self.TYPE.minifig
+        super(Minifig, self).save(*args, **kwargs)
 
 
 class Colour(models.Model):
     name = models.CharField(max_length=256)
     number = models.PositiveIntegerField()
-    slug = models.SlugField(default='', max_length=32)
+    slug = models.SlugField(default='', max_length=64, editable=False)
 
     tlg_name = models.CharField(max_length=256, blank=True, default='')
     tlg_number = models.PositiveIntegerField(blank=True, null=True)
     ldraw_name = models.CharField(max_length=256, blank=True, default='')
     ldraw_number = models.PositiveIntegerField(blank=True, null=True)
 
-    def __unicode__(self):
+    def __str__(self):
         return self.name
 
     def save(self, *args, **kwargs):
@@ -99,15 +119,15 @@ class Element(models.Model):
     """
     An Element is a Part in a given Colour. Due to TLG's ID numbers for
     elements changing when elements are reactivated with same mold we need a
-    list of some kind for those since we don't differentiate between them.
+    list for those since we don't differentiate between them.
     """
-    part = models.ForeignKey(Part, related_name='elements')
-    colour = models.ForeignKey(Colour, related_name='elements')
-    #lego_id = models.PositiveIntegerField(blank=True, null=True)
+    part = models.ForeignKey(Part, related_name='elements', on_delete=models.CASCADE)
+    colour = models.ForeignKey(Colour, related_name='elements', on_delete=models.CASCADE)
+    lego_ids = pgfields.JSONField(default=list) 
 
     objects = ElementQuerySet.as_manager()
 
-    def __unicode__(self):
+    def __str__(self):
         return '%s %s' % (self.colour, self.part)
 
     @property
@@ -115,28 +135,36 @@ class Element(models.Model):
         return '%s_%d' % (self.part.number, self.colour.number)
     
 
-class ItemElement(models.Model):
+class ItemInventory(models.Model):
     """
-    An Element that's part of an Item (Set, Part, etc)
+    Item inventories are tricky things since an Item can contain other Items
+    that in turn can contain other Items etc. 
     """
-    item = models.ForeignKey(CatalogItem, related_name='inventory')
-    element = models.ForeignKey(Element, related_name='in_sets')
-    amount = models.PositiveIntegerField(default=1)
+    part_of = models.ForeignKey(CatalogItem, related_name='inventory', on_delete=models.CASCADE)
+    item = models.ForeignKey(CatalogItem, null=True, related_name='part_of', on_delete=models.CASCADE)
+    element = models.ForeignKey(Element, null=True, related_name='part_of', on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+
+    # the fields below are included in case we go nuts and decide to mirror
+    # BL's inventories closely, but that is unlikely
     is_extra = models.BooleanField(default=False)
     is_counterpart = models.BooleanField(default=False)
     is_alternate = models.BooleanField(default=False)
     match_id = models.PositiveIntegerField(blank=True, default=0)
 
-    def __unicode__(self):
+    def __str__(self):
         return '%dx %s' % (self.amount, self.element)
 
     
-class SetOwned(models.Model):
-    owned_set = models.ForeignKey(Set, related_name='owners')
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sets_owned')
-    amount = models.PositiveIntegerField(default=1)
+class ItemOwned(models.Model):
+    """
+    All sorts of items can be owned
+    """
+    owned_item = models.ForeignKey(CatalogItem, related_name='owners', on_delete=models.CASCADE)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sets_owned', on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
     # XXX: state ? (parted out, MISB, deboxed, other?)
 
-    def __unicode__(self):
-        dic = {'number': self.amount, 'name': self.owned_set.name, 'owner': self.owner.username}
-        return ugettext('%(number)s x %(name)s owned by %(owner)s') % dic
+    def __str__(self):
+        fmt_kw = {'quantity': self.quantity, 'name': self.owned_item.name, 'owner': self.owner}
+        return ugettext("{quantity} x %{name} owned by {owner}").format(**fmt_kw) 
