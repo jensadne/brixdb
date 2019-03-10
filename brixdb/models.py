@@ -1,6 +1,3 @@
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals, absolute_import
-
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.postgres import fields as pgfields
@@ -10,9 +7,10 @@ from django.utils.translation import ugettext, ugettext_lazy as _
 
 from model_utils import Choices
 
+from polymorphic.managers import PolymorphicManager
 from polymorphic.models import PolymorphicModel
 
-from .managers import SetQuerySet, PartQuerySet, ElementQuerySet, MinifigQuerySet
+from .managers import CatalogItemQuerySet, ElementQuerySet, MinifigQuerySet, PartQuerySet, SetQuerySet
 
 
 class User(AbstractBaseUser):
@@ -49,6 +47,7 @@ class CatalogItem(PolymorphicModel):
     # most of TLG's names are horribly weird, but we'd like to keep track of them anyway
     tlg_name = models.CharField(max_length=256, blank=True, default='')
 
+    objects = PolymorphicManager.from_queryset(CatalogItemQuerySet)()
     all_objects = models.Manager()
 
     def __str__(self):
@@ -60,7 +59,7 @@ class CatalogItem(PolymorphicModel):
 
 
 class Set(CatalogItem):
-    objects = models.Manager.from_queryset(SetQuerySet)()
+    objects = PolymorphicManager.from_queryset(SetQuerySet)()
 
     class Meta:
         ordering = ('number',)
@@ -74,7 +73,7 @@ class Set(CatalogItem):
 
 
 class Part(CatalogItem):
-    objects = models.Manager.from_queryset(PartQuerySet)()
+    objects = PolymorphicManager.from_queryset(PartQuerySet)()
 
     class Meta:
         proxy = True
@@ -86,7 +85,7 @@ class Part(CatalogItem):
 
 
 class Minifig(CatalogItem):
-    objects = models.Manager.from_queryset(MinifigQuerySet)()
+    objects = PolymorphicManager.from_queryset(MinifigQuerySet)()
 
     class Meta:
         proxy = True

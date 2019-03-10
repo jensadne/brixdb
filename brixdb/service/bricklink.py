@@ -10,32 +10,70 @@ from django.conf import settings
 
 import requests
 
-from .models import Part, Category, Element, Set, Colour, CatalogItem
+from ..models import Part, Category, Element, Set, Colour, CatalogItem
 
 
-def fetch_categories():
-    url = 'http://www.bricklink.com/catalogDownload.asp?a=a'
+def fake_headers(url):
+    """
+    Bricklink is stupid and thinks referrer and user-agent checks are
+    worthwhile in this day and age..
+    """
+    return {'referrer': url, 'User-agent': 'Mozilla/5.0'}
+
+
+def create_session():
+    """
+    Since downloading Bricklink's catalog now requires a valid user session we
+    must create one.
+    """
+    url = 'https://www.bricklink.com/ajax/renovate/loginandout.ajax'
+    session = requests.Session()
+    data = {'userid': settings.BRICKLINK_USERNAME, 'password': settings.BRICKLINK_PASSWORD, 
+            'keepme_loggedin': False, 'mid': '168ceb4f73700000-a25f3a8ad3ebeb5f',
+            'pageid': 'MAIN'}
+    session.post(url, data, headers=fake_headers(url))
+    return session
+
+
+def fetch_categories(session=None):
+    session = session if session is not None else create_session()
+
+    url = 'https://www.bricklink.com/catalogDownload.asp?a=a'
+
+    """
+    itemType: S
+viewType: 2
+itemTypeInv: S
+itemNo:
+downloadType: T
+    """
+
     # viewType 2 == categories
-    dat = requests.post(url, data={'itemNo': '', 'viewType': '2', 'downloadType': 'T', 'itemTypeInv': 'S'},
-                        headers={'referrer': url, 'User-agent': 'Mozilla/5.0'}).text
+    data = {'itemNo': '', 'itemType': 'S', 'viewType': '2', 'downloadType': 'T', 'itemTypeInv': 'S'}
+    response = session.post(url, data=data, headers=fake_headers(url)).text
     # Bricklink's download page is somewhat stupid, so we can't check against
     # status_code here
-    if '<!doctype html>' in dat[:100]:
+    if '<!doctype html>' in response[:100]:
         return False
     os.mkdirs(os.path.join(settings.MEDIA_ROOT, 'base'))
     with open(os.path.join(settings.MEDIA_ROOT, 'base', 'categories.txt'), 'wb') as f:
-        f.write(dat.encode('utf8'))
-    return dat
+        f.write(response.encode('utf8'))
+    return response
 
 
-def import_categories(dat):
-    pass
+def import_categories(data=None):
+    data = data if data else fetch_categories()
+    # if Bricklink has decided to hate us again there's little we can do now
+    if not data:
+        return False
+    lines = [l.strip().split('\t') for l in data.split('\n') if l.strip()]
 
 
-def fetch_bricklink_inventory(item):
+def fetch_bricklink_inventory(item, session=None):
+    session = session if session is not None else create_session()
     inv_types = {CatalogItem.TYPE.Set: 'S', CatalogItem.TYPE.gear: 'G',
                  CatalogItem.TYPE.minifig: 'M', CatalogItem.TYPE.part: 'P'}
-    url = 'http://www.bricklink.com/catalogDownload.asp?a=a'
+    url = 'https://www.bricklink.com/catalogDownload.asp?a=a'
     dat = requests.post(url, data={'itemNo': item.number, 'viewType': '4', 'downloadType': 'T', 
                                    'itemTypeInv': inv_types[item.item_type]},
                         headers={'referrer': url, 'User-agent': 'Mozilla/5.0'}).text

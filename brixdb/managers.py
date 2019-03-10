@@ -2,12 +2,18 @@
 from django.apps import apps
 from django.db.models.query import QuerySet
 
+from polymorphic.managers import PolymorphicQuerySet
 
-class SetQuerySet(QuerySet):
+
+class CatalogItemQuerySet(PolymorphicQuerySet):
     pass
 
 
-class PartQuerySet(QuerySet):
+class SetQuerySet(CatalogItemQuerySet):
+    pass
+
+
+class PartQuerySet(CatalogItemQuerySet):
     pass
 
 
@@ -32,5 +38,5 @@ class ElementQuerySet(QuerySet):
         return self.filter(colour=colour)
 
 
-class MinifigQuerySet(QuerySet):
+class MinifigQuerySet(CatalogItemQuerySet):
     pass
