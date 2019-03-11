@@ -97,6 +97,11 @@ class Minifig(CatalogItem):
 
 
 class Colour(models.Model):
+    """
+    Name and number correspond to Bricklink data. This probably means there
+    will be mismatches in cases where TLG and BL don't agree, but that's
+    luckily irrelevant for us.
+    """
     name = models.CharField(max_length=256)
     number = models.PositiveIntegerField()
     slug = models.SlugField(default='', max_length=64, editable=False)
