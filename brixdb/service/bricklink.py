@@ -36,17 +36,12 @@ def create_session():
 
 
 def fetch_categories(session=None):
+    """
+    Fetch the list of Bricklink categories. These rarely change.
+    """
     session = session if session is not None else create_session()
 
     url = 'https://www.bricklink.com/catalogDownload.asp?a=a'
-
-    """
-    itemType: S
-viewType: 2
-itemTypeInv: S
-itemNo:
-downloadType: T
-    """
 
     # viewType 2 == categories
     data = {'itemNo': '', 'itemType': 'S', 'viewType': '2', 'downloadType': 'T', 'itemTypeInv': 'S'}
@@ -62,11 +57,26 @@ downloadType: T
 
 
 def import_categories(data=None):
+    """
+    Import flat list of categories, without parents since BL don't provide us
+    with that information. :-(
+    """
     data = data if data else fetch_categories()
     # if Bricklink has decided to hate us again there's little we can do now
     if not data:
         return False
-    lines = [l.strip().split('\t') for l in data.split('\n') if l.strip()]
+    # there's one row of headers so slice that off
+    lines = [l.strip().split('\t') for l in data.split('\n') if l.strip()][1:]
+    categories = Category.objects.values_list('pk', 'bl_id', 'name')
+    existing = {bl_id: {'pk': pk, 'name': name} for pk, bl_id, name in categories}
+    for bl_id, name in lines:
+        bl_id = int(bl_id)
+        if bl_id in existing:
+            if name == existing[bl_id]['name']:
+                continue
+            Category.objects.filter(pk=existing[bl_id]['pk']).update(name=name)
+        else:
+            Category.objects.create(bl_id=bl_id, name=name)
 
 
 def fetch_bricklink_inventory(item, session=None):
