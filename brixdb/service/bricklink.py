@@ -44,6 +44,10 @@ def fetch_catalog_file(view_type, file_path, item_number='', item_type='S', sess
     url = 'https://www.bricklink.com/catalogDownload.asp?a=a'
     data = {'itemNo': item_number, 'itemType': item_type, 'viewType': view_type,
             'downloadType': 'T', 'itemTypeInv': 'S'}
+    # all CATALOG fetches we also want the extra data for
+    if view_type == ViewType.CATALOG:
+        data.update({'selYear': 'Y', 'selWeight': 'Y', 'selDim': 'Y'})
+
     response = session.post(url, data=data, headers=fake_headers(url)).text
     # Bricklink's download page is somewhat stupid, so we can't check against
     # status_code here
@@ -62,8 +66,10 @@ def fetch_catalog_file(view_type, file_path, item_number='', item_type='S', sess
 
 
 class ViewType:
+    CATALOG = '0'
     CATEGORIES = '2'
     COLOURS = '3'
+    INVENTORY = '4'
 
 
 def fetch_categories(session=None):
@@ -114,37 +120,35 @@ def import_colours(data):
         colour, _ = Colour.objects.update_or_create(number=colour_id, defaults={'name': colour_name})
 
 
-def import_bricklink_setlist(dat):
+def fetch_sets(session=None):
+    """
+    Fetch Bricklink's set list. It changes quite often, but checking daily
+    should be enough.
+    """
+    return fetch_catalog_file(ViewType.CATALOG, os.path.join('base', 'sets_{date}.txt').format(date=date.today()),
+                              item_type='S', session=session)
+
+
+def import_sets(data):
     """
     Imports a set list downloaded from Bricklink
     """
-    lines = [l.strip().split('\t') for l in dat.split('\n')][3:]
-    for l in lines:
-        if not l or not l[0]:
-            continue
+    for l in data:
         category_id, category_name, set_number, set_name = l[:4]
         #if len(l) > 4:
         #    TODO: weight, dimensions, year released
         category, created = Category.objects.get_or_create(bl_id=category_id, name=category_name)
-        if created:
-            category.save()
-            
         _set, created = Set.objects.get_or_create(category=category, number=set_number, name=set_name) 
-        if created:
-            _set.save()
 
 
-def import_bricklink_partslist(dat):
+def import_parts(data):
     """
     Imports a tab separated part list downloaded from Bricklink
 
     Headers:
     Category ID	Category Name	Number	Name
     """
-    lines = [l.strip().split('\t') for l in dat.split('\n')][3:]
-    for l in lines:
-        if not l or not l[0]:
-            continue
+    for l in data:
         category_id, category_name, part_number, part_name = l[:4]
         # TODO: weight, year, etc
         category, created = Category.objects.get_or_create(bl_id=category_id, name=category_name)
