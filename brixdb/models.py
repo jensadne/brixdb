@@ -24,13 +24,32 @@ class User(AbstractBaseUser):
         return self.name if self.name else self.email.split('@')[0]
 
 
-class Category(models.Model):
-    parent = models.ForeignKey('self', related_name='sub_categories', blank=True, null=True, on_delete=models.CASCADE)
+class BricklinkCategory(models.Model):
+    """
+    Due to Bricklink's categories being completely bonkers with the same
+    category used as a sub-category of multiple others we need two category
+    models, one for keeping BL's category list for lookups and one that makes a
+    sensible tree structure.
+    """
     bl_id = models.PositiveIntegerField()
     name = models.CharField(max_length=256)
 
     def __str__(self):
-        return self.name 
+        return self.name
+
+
+class Category(models.Model):
+    parent = models.ForeignKey('self', related_name='sub_categories', blank=True, null=True, on_delete=models.CASCADE)
+    name = models.CharField(max_length=256)
+    # we use SET_NULL here in case BL does some stupid fuckery and we don't
+    # want our whole database to go away if that happens
+    bl_category = models.ForeignKey(BricklinkCategory, on_delete=models.SET_NULL, blank=True, null=True)
+    # bl_id here refers to the complete dotted path like 123.456.789
+    bl_id = models.CharField(max_length=16)
+
+    def __str__(self):
+        return self.name
+
 
 
 class CatalogItem(PolymorphicModel):
@@ -41,8 +60,11 @@ class CatalogItem(PolymorphicModel):
     name = models.CharField(max_length=256)
     number = models.CharField(max_length=32)
     no_inventory = models.BooleanField(default=False)
-    year_released = models.PositiveIntegerField(default=0)
+    year_released = models.PositiveIntegerField(blank=True, null=True)
     bl_id = models.PositiveIntegerField(default=0)
+
+    weight = models.PositiveIntegerField(blank=True, null=True)
+    dimensions = models.CharField(max_length=64, blank=True, null=True)
 
     # most of TLG's names are horribly weird, but we'd like to keep track of them anyway
     tlg_name = models.CharField(max_length=256, blank=True, default='')
@@ -68,7 +90,8 @@ class Set(CatalogItem):
         return '%s %s' % (self.number, self.name)
 
     def save(self, *args, **kwargs):
-        self.item_type = self.TYPE.set
+        if not self.pk:
+            self.item_type = self.TYPE.set
         super(Set, self).save(*args, **kwargs)
 
 
@@ -76,11 +99,11 @@ class Part(CatalogItem):
     objects = PolymorphicManager.from_queryset(PartQuerySet)()
 
     class Meta:
-        proxy = True
         ordering = ('name',)
 
     def save(self, *args, **kwargs):
-        self.item_type = self.TYPE.part
+        if not self.pk:
+            self.item_type = self.TYPE.part
         super(Part, self).save(*args, **kwargs)
 
 
@@ -88,11 +111,11 @@ class Minifig(CatalogItem):
     objects = PolymorphicManager.from_queryset(MinifigQuerySet)()
 
     class Meta:
-        proxy = True
         ordering = ('name',)
     
     def save(self, *args, **kwargs):
-        self.item_type = self.TYPE.minifig
+        if not self.pk:
+            self.item_type = self.TYPE.minifig
         super(Minifig, self).save(*args, **kwargs)
 
 

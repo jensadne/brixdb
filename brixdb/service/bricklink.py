@@ -10,7 +10,7 @@ from django.conf import settings
 
 import requests
 
-from ..models import Part, Category, Element, Set, Colour, CatalogItem
+from ..models import BricklinkCategory, CatalogItem, Category, Colour, Element, Part, Set
 
 
 def fake_headers(url):
@@ -89,7 +89,7 @@ def import_categories(data=None):
     if not data:
         return False
 
-    categories = Category.objects.values_list('pk', 'bl_id', 'name')
+    categories = BricklinkCategory.objects.values_list('pk', 'bl_id', 'name')
     existing = {bl_id: {'pk': pk, 'name': name} for pk, bl_id, name in categories}
     for bl_id, name in data:
         bl_id = int(bl_id)
