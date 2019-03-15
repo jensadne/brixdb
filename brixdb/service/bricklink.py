@@ -133,12 +133,52 @@ def import_sets(data):
     """
     Imports a set list downloaded from Bricklink
     """
+    if not BricklinkCategory.objects.exists():
+        # TODO: proper exception class here
+        raise Exception("Import Bricklink's categories first!")
+
+    # another bonkers case, BL's category names in the set list are the
+    # complete branch of the tree-that-isn't-a tree, so to get our _actual_
+    # category we must construct the full dotted bl_id from the category names,
+    # separated by /, then and use that to find the proper category, if
+    # necessary creating the whole branch
+
+    bl_categories = {}
+    for bl_id, name in BricklinkCategory.objects.values_list('bl_id', 'name'):
+        bl_categories[name] = bl_id
+    categories = {}
+    # XXX this is not optimal, we don't actually need the whole Category object here
+    for category in Category.objects.all():
+        categories[category.bl_id] = category
+
+    # TODO: find a sensible way of handling getting here with a non-existant
+    # category, Which admittedly is highly unlikely if we run this as part of a
+    # daily celery task, but still
     for l in data:
-        category_id, category_name, set_number, set_name = l[:4]
-        #if len(l) > 4:
-        #    TODO: weight, dimensions, year released
-        category, created = Category.objects.get_or_create(bl_id=category_id, name=category_name)
-        _set, created = Set.objects.get_or_create(category=category, number=set_number, name=set_name) 
+        category_id, category_name, set_number, set_name, year, weight, dimensions = l[:7]
+        names = category_name.split(' / ')
+        print(names)
+        category_name = names[-1]
+        bl_ids = [bl_categories[name] for name in names]
+        for i, bl_id in enumerate(bl_ids[1:]):
+            bl_ids[i+1] = '{}.{}'.format(bl_ids[i], bl_id)
+        print(bl_ids)
+        category_id = bl_ids[-1]
+        print(category_id)
+        # ensure this whole branch exists
+        categories[bl_ids[0]], _ = Category.objects.get_or_create(bl_id=bl_ids[0], defaults={'name': names[0]})
+        for i, bl_id in enumerate(bl_ids[1:]):
+            kw = {'bl_id': bl_id, 'name': names[i+1]}
+            categories[bl_id] = categories.get(bl_id, categories[bl_ids[i]].sub_categories.create(**kw))
+        # this should definitely exist now
+        category = categories[category_id]
+        # the set's number is least likely to change, though that _can_ also
+        # happen. because BL
+        weight = weight if weight != '?' else None
+        year = year if year.isdigit() else None
+        _set, _ = Set.objects.update_or_create(number=set_number, defaults={'name': set_name, 'category': category,
+                                                                            'year_released': year, 'weight': weight,
+                                                                            'dimensions': dimensions}) 
 
 
 def import_parts(data):
