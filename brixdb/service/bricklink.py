@@ -33,6 +33,10 @@ def create_session():
             'keepme_loggedin': False, 'mid': '168ceb4f73700000-a25f3a8ad3ebeb5f',
             'pageid': 'MAIN'}
     session.post(url, data, headers=fake_headers(url))
+    # some of the cookies seem to only be set on the first visit, so for
+    # simplicity we just fetch the colours list here. In the Future(tm) we'll
+    # do this properly
+    fetch_colours(session=session)
     return session
 
 
@@ -43,7 +47,7 @@ class ViewType:
     INVENTORY = '4'
 
 
-def fetch_catalog_file(view_type, file_path, item_number='', item_type='S', session=None):
+def fetch_catalog_file(view_type, file_path, item_number='', item_type='S', item_type_inv='S', session=None):
     """
     Common handling for all catalog downloads. Downloads tab separated file
     from Bricklink, then strips and splits into lines for further handling.
@@ -51,7 +55,7 @@ def fetch_catalog_file(view_type, file_path, item_number='', item_type='S', sess
     session = session if session is not None else create_session()
     url = 'https://www.bricklink.com/catalogDownload.asp?a=a'
     data = {'itemNo': item_number, 'itemType': item_type, 'viewType': view_type,
-            'downloadType': 'T', 'itemTypeInv': 'S'}
+            'downloadType': 'T', 'itemTypeInv': item_type_inv}
     # all CATALOG fetches we also want the extra data for
     if view_type == ViewType.CATALOG:
         data.update({'selYear': 'Y', 'selWeight': 'Y', 'selDim': 'Y'})
@@ -159,8 +163,8 @@ def import_sets(data):
     # daily celery task, but still
 
     # there are certain categories where the name actually contains a forward
-    # slash, which breaks the split() trick below. So to compensate for THAT we
-    # do more uglyness here
+    # slash, which breaks the split() trick below. So to compensate for THAT
+    # TOO we do more uglyness here
     weird_categories = {c.name.split(' / ')[0]: c for c in BricklinkCategory.objects.filter(name__contains=' / ')}
     for l in data:
         category_id, category_name, set_number, set_name, year, weight, dimensions = l[:7]
@@ -212,25 +216,16 @@ def import_parts(data):
             part.save()
 
 
-def fetch_bricklink_inventory(item, session=None):
+def fetch_inventory(item, session=None):
     session = session if session is not None else create_session()
-    inv_types = {CatalogItem.TYPE.Set: 'S', CatalogItem.TYPE.gear: 'G',
+    inv_types = {CatalogItem.TYPE.set: 'S', CatalogItem.TYPE.gear: 'G',
                  CatalogItem.TYPE.minifig: 'M', CatalogItem.TYPE.part: 'P'}
-    url = 'https://www.bricklink.com/catalogDownload.asp?a=a'
-    dat = requests.post(url, data={'itemNo': item.number, 'viewType': '4', 'downloadType': 'T',
-                                   'itemTypeInv': inv_types[item.item_type]},
-                        headers={'referrer': url, 'User-agent': 'Mozilla/5.0'}).text
-    # Bricklink's download page is somewhat stupid, so we can't check against
-    # status_code here
-    if '<!doctype html>' in dat[:100]:
-        return False
-    os.mkdirs(os.path.join(settings.MEDIA_ROOT, 'inventories'))
-    with open(os.path.join(settings.MEDIA_ROOT, 'inventories', '{}.txt'.format(item.number)), 'wb') as f:
-        f.write(dat.encode('utf8'))
-    return dat
+    item_type = inv_types[item.item_type]
+    return fetch_catalog_file(ViewType.INVENTORY, os.path.join('inventories', '{num}.txt').format(num=item.number),
+                              item_number=item.number, item_type=item_type, item_type_inv=item_type, session=session)
 
 
-def import_bricklink_inventory(_set, dat):
+def import_inventory(_set, dat):
     """
     Parses an inventory downloaded from Bricklink and stores it locally
     """
