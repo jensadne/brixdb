@@ -3,6 +3,7 @@ Service functions for dealing with Bricklink. Much uglyness due to Bricklink
 not exposing things sensibly.
 """
 from datetime import date
+import html
 import os
 import re
 
@@ -28,11 +29,18 @@ def create_session():
     """
     url = 'https://www.bricklink.com/ajax/renovate/loginandout.ajax'
     session = requests.Session()
-    data = {'userid': settings.BRICKLINK_USERNAME, 'password': settings.BRICKLINK_PASSWORD, 
+    data = {'userid': settings.BRICKLINK_USERNAME, 'password': settings.BRICKLINK_PASSWORD,
             'keepme_loggedin': False, 'mid': '168ceb4f73700000-a25f3a8ad3ebeb5f',
             'pageid': 'MAIN'}
     session.post(url, data, headers=fake_headers(url))
     return session
+
+
+class ViewType:
+    CATALOG = '0'
+    CATEGORIES = '2'
+    COLOURS = '3'
+    INVENTORY = '4'
 
 
 def fetch_catalog_file(view_type, file_path, item_number='', item_type='S', session=None):
@@ -65,13 +73,6 @@ def fetch_catalog_file(view_type, file_path, item_number='', item_type='S', sess
     return lines
 
 
-class ViewType:
-    CATALOG = '0'
-    CATEGORIES = '2'
-    COLOURS = '3'
-    INVENTORY = '4'
-
-
 def fetch_categories(session=None):
     """
     Fetch the list of Bricklink categories. These rarely change.
@@ -93,12 +94,14 @@ def import_categories(data=None):
     existing = {bl_id: {'pk': pk, 'name': name} for pk, bl_id, name in categories}
     for bl_id, name in data:
         bl_id = int(bl_id)
+        # there might be html entities in the name because BL
+        name = html.unescape(name)
         if bl_id in existing:
             if name == existing[bl_id]['name']:
                 continue
-            Category.objects.filter(pk=existing[bl_id]['pk']).update(name=name)
+            BricklinkCategory.objects.filter(pk=existing[bl_id]['pk']).update(name=name)
         else:
-            Category.objects.create(bl_id=bl_id, name=name)
+            BricklinkCategory.objects.create(bl_id=bl_id, name=name)
 
 
 def fetch_colours(session=None):
@@ -154,17 +157,26 @@ def import_sets(data):
     # TODO: find a sensible way of handling getting here with a non-existant
     # category, Which admittedly is highly unlikely if we run this as part of a
     # daily celery task, but still
+
+    # there are certain categories where the name actually contains a forward
+    # slash, which breaks the split() trick below. So to compensate for THAT we
+    # do more uglyness here
+    weird_categories = {c.name.split(' / ')[0]: c for c in BricklinkCategory.objects.filter(name__contains=' / ')}
     for l in data:
         category_id, category_name, set_number, set_name, year, weight, dimensions = l[:7]
         names = category_name.split(' / ')
-        print(names)
+
+        # see if this is a weird category name that should actually include the slash
+        for i, name in enumerate(names):
+            if name in weird_categories:
+                names.pop(i+1)
+                names[i] = weird_categories[name].name
+
         category_name = names[-1]
         bl_ids = [bl_categories[name] for name in names]
         for i, bl_id in enumerate(bl_ids[1:]):
             bl_ids[i+1] = '{}.{}'.format(bl_ids[i], bl_id)
-        print(bl_ids)
         category_id = bl_ids[-1]
-        print(category_id)
         # ensure this whole branch exists
         categories[bl_ids[0]], _ = Category.objects.get_or_create(bl_id=bl_ids[0], defaults={'name': names[0]})
         for i, bl_id in enumerate(bl_ids[1:]):
@@ -178,7 +190,7 @@ def import_sets(data):
         year = year if year.isdigit() else None
         _set, _ = Set.objects.update_or_create(number=set_number, defaults={'name': set_name, 'category': category,
                                                                             'year_released': year, 'weight': weight,
-                                                                            'dimensions': dimensions}) 
+                                                                            'dimensions': dimensions})
 
 
 def import_parts(data):
@@ -205,7 +217,7 @@ def fetch_bricklink_inventory(item, session=None):
     inv_types = {CatalogItem.TYPE.Set: 'S', CatalogItem.TYPE.gear: 'G',
                  CatalogItem.TYPE.minifig: 'M', CatalogItem.TYPE.part: 'P'}
     url = 'https://www.bricklink.com/catalogDownload.asp?a=a'
-    dat = requests.post(url, data={'itemNo': item.number, 'viewType': '4', 'downloadType': 'T', 
+    dat = requests.post(url, data={'itemNo': item.number, 'viewType': '4', 'downloadType': 'T',
                                    'itemTypeInv': inv_types[item.item_type]},
                         headers={'referrer': url, 'User-agent': 'Mozilla/5.0'}).text
     # Bricklink's download page is somewhat stupid, so we can't check against
@@ -219,7 +231,7 @@ def fetch_bricklink_inventory(item, session=None):
 
 
 def import_bricklink_inventory(_set, dat):
-    """ 
+    """
     Parses an inventory downloaded from Bricklink and stores it locally
     """
     #_models = {'P': Part, 'S': Set, 'G': Set, 'M': Minifig}
@@ -309,7 +321,7 @@ def parse_bricklink_order(dat):
         content_match = part_content_re.match(line)
         if content_match:
             groups = content_match.groupdict()
-            state, part_info, quantity = groups['state'], groups['part_info'], int(groups['quantity']) 
+            state, part_info, quantity = groups['state'], groups['part_info'], int(groups['quantity'])
             colour, part_name = find_colour_part(part_info)
             try:
                 part = Part.objects.get(name=part_name)

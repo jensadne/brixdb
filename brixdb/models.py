@@ -45,7 +45,7 @@ class Category(models.Model):
     # want our whole database to go away if that happens
     bl_category = models.ForeignKey(BricklinkCategory, on_delete=models.SET_NULL, blank=True, null=True)
     # bl_id here refers to the complete dotted path like 123.456.789
-    bl_id = models.CharField(max_length=16)
+    bl_id = models.CharField(max_length=64)
 
     def __str__(self):
         return self.name
@@ -63,7 +63,7 @@ class CatalogItem(PolymorphicModel):
     year_released = models.PositiveIntegerField(blank=True, null=True)
     bl_id = models.PositiveIntegerField(default=0)
 
-    weight = models.PositiveIntegerField(blank=True, null=True)
+    weight = models.DecimalField(decimal_places=4, max_digits=9, blank=True, null=True)
     dimensions = models.CharField(max_length=64, blank=True, null=True)
 
     # most of TLG's names are horribly weird, but we'd like to keep track of them anyway
