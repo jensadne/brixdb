@@ -197,6 +197,11 @@ def import_sets(data):
                                                                             'dimensions': dimensions})
 
 
+def fetch_parts(session=None):
+    return fetch_catalog_file(ViewType.CATALOG, os.path.join('base', 'parts_{date}.txt').format(date=date.today()),
+                              item_type='P', session=session)
+
+
 def import_parts(data):
     """
     Imports a tab separated part list downloaded from Bricklink
