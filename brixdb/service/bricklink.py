@@ -180,12 +180,21 @@ def import_sets(data):
         bl_ids = [bl_categories[name] for name in names]
         for i, bl_id in enumerate(bl_ids[1:]):
             bl_ids[i+1] = '{}.{}'.format(bl_ids[i], bl_id)
+
+        # find the _actual_ category_id
         category_id = bl_ids[-1]
+
         # ensure this whole branch exists
         categories[bl_ids[0]], _ = Category.objects.get_or_create(bl_id=bl_ids[0], defaults={'name': names[0]})
         for i, bl_id in enumerate(bl_ids[1:]):
             kw = {'bl_id': bl_id, 'name': names[i+1]}
-            categories[bl_id] = categories.get(bl_id, categories[bl_ids[i]].sub_categories.create(**kw))
+            if not bl_id in categories:
+                categories[bl_id] = categories[bl_ids[i]].sub_categories.create(**kw)
+            elif categories[bl_id].name != kw['name']:
+                # TODO: here we should also handle cases of categories that now have
+                #       a different parent
+                Category.objects.filter(bl_id=bl_id).update(name=kw['name'])
+
         # this should definitely exist now
         category = categories[category_id]
         # the set's number is least likely to change, though that _can_ also
