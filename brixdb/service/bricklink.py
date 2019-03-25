@@ -8,10 +8,12 @@ import os
 import re
 
 from django.conf import settings
+from django.db.models import F
 
 import requests
 
-from ..models import BricklinkCategory, CatalogItem, Category, Colour, Element, Part, Set, Minifig
+from ..models import (BricklinkCategory, CatalogItem, Category, Colour, Element, Part, Set, Minifig,
+                      ItemInventory)  
 
 
 def fake_headers(url):
@@ -23,10 +25,22 @@ def fake_headers(url):
 
 
 class ViewType:
+    """
+    These are the various ViewTypes Bricklink's catalog download page expects.
+    """
     CATALOG = '0'
     CATEGORIES = '2'
     COLOURS = '3'
     INVENTORY = '4'
+    ELEMENTS = '5'
+
+
+class ItemType:
+    BOOK = 'B'
+    GEAR = 'G'
+    MINIFIG = 'M'
+    PART = 'P'
+    SET = 'S'
 
 
 class BricklinkCatalogClient(object):
@@ -36,6 +50,9 @@ class BricklinkCatalogClient(object):
     bl_categories = None
     categories = None
     weird_categories = None
+    elements = None
+    colours = None
+    items = None
 
     def __init__(self):
         self.session = self.create_session()
@@ -220,31 +237,26 @@ class BricklinkCatalogClient(object):
             # happen. because BL
             weight = weight if weight != '?' else None
             year = year if year.isdigit() else None
-            _set, _ = Set.objects.update_or_create(number=set_number, defaults={'name': set_name, 'category': category,
-                                                                                'year_released': year, 'weight': weight,
-                                                                                'dimensions': dimensions})
+            _set, _ = Set.objects.update_or_create(number=set_number,
+                                                   defaults={'name': set_name, 'category': category, 'weight': weight,
+                                                             'year_released': year, 'dimensions': dimensions})
 
     def fetch_parts(self):
         file_name = os.path.join('base', 'parts_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type='P')
 
-    def import_parts(data):
+    def import_parts(self, data):
         """
         Imports a tab separated part list downloaded from Bricklink
 
         Headers:
-        Category ID	Category Name	Number	Name
+        Category ID	Category Name	Number	Name    Weight  Dimensions
         """
-        for l in data:
-            category_id, category_name, part_number, part_name = l[:4]
-            # TODO: weight, year, etc
-            category, created = Category.objects.get_or_create(bl_id=category_id, name=category_name)
-            if created:
-                category.save()
-
-            part, created = Part.objects.get_or_create(category=category, number=part_number, name=part_name)
-            if created:
-                part.save()
+        for category_id, category_name, number, name, weight, dimensions in data:
+            weight = weight if weight != '?' else None
+            defaults = {'name': name, 'category': self.get_category(category_name),
+                        'weight': weight, 'dimensions': dimensions}
+            part, _ = Part.objects.update_or_create(number=number, defaults=defaults)
 
     def fetch_minifigs(self):
         """
@@ -271,6 +283,22 @@ class BricklinkCatalogClient(object):
                                                       defaults={'name': name, 'category': category,
                                                                 'year_released': year, 'weight': weight})
 
+    def fetch_elements(self):
+        """
+        Fetches the current list of part+colour combinations from Bricklink
+        """
+        file_name = os.path.join('base', 'elements_{date}.txt').format(date=date.today())
+        return self.fetch_catalog_file(ViewType.ELEMENTS, file_name, item_type=ItemType.SET)
+
+    def import_elements(self, data):
+        """
+        Import Bricklink's list of part+colour combinations and create Elements
+        for them. This needs to handle cases of multiple element-ids from TLG
+        for the same part+colour combination since Bricklink doesn't consider
+        those separate, and neither do we.
+        """
+        pass
+
     def fetch_inventory(self, item):
         """
         Fetches the inventory for the given CatalogItem so it can be imported
@@ -283,45 +311,96 @@ class BricklinkCatalogClient(object):
         return self.fetch_catalog_file(ViewType.INVENTORY, file_name, item_number=item.number, item_type=item_type,
                                        item_type_inv=item_type)
 
-    def import_inventory(self, _set, dat):
+    def get_colour(self, number):
+        """
+        Not 100% if we need this, but might as well have it. Since getting an
+        unknown colour out of the blue is highly unlikely we don't bother with
+        clever error handling here.
+        """
+        if not self.colours:
+            self.colours = {colour.number: colour for colour in Colour.objects.all()}
+        return self.colours[int(number)]
+
+    def get_element_key(self, number, colour):
+        """
+        The lookup key for elements
+        """
+        return '{}_{}'.format(number, colour)
+
+    def get_element(self, number, colour):
+        """
+        When the item type in the inventory is ItemType.PART we actually want
+        to map to an Element
+        """
+        if not self.elements:
+            self.elements = {}
+            for element in Element.objects.select_related('part', 'colour'):
+                elem_key = self.get_element_key(element.part.number, element.colour.number)
+                self.elements[elem_key] = element
+
+        colour = self.get_colour(colour)
+        elem_key = '{}_{}'.format(number, colour.number)
+        # this on the other hand can probably happen, so we have to handle it
+        element = self.elements.get(elem_key)
+        if element == None:
+            part = self.get_item(number, item_type=CatalogItem.TYPE.part)
+            self.elements[elem_key] = element = Element.objects.get_or_create(part=part, colour=colour)[0]
+        return element
+
+    def get_item(self, number, name=None, item_type=None):
+        """
+        Whenever we're not adding an Element to the Item's inventory we use
+        this method. Later we intend to extend this to handle lookups by name
+        too, for importing Bricklink orders
+        """
+        if self.items is None:
+            self.items = {item.number: item for item in CatalogItem.objects.all()}
+        # later we might want to do this in a more sensible way..
+        if item_type:
+            item = self.items.get(number, None)
+            if not item or item.item_type != item_type:
+                fmt_kwargs = {'type': item_type, 'item': number, 'real_type': (item.item_type if item else None)} 
+                raise ValueError("Invalid item_type {type}! {item} is type {real_type}!".format(**fmt_kwargs))
+        # this might not be good enough, but meh
+        return self.items[number]
+
+    def import_inventory(self, item, data):
         """
         Parses an inventory downloaded from Bricklink and stores it locally
+
+        Headers:
+        Type	Item No	Item Name	Qty	Color ID	Extra?	Alternate?	Match ID	Counterpart?
         """
-        #_models = {'P': Part, 'S': Set, 'G': Set, 'M': Minifig}
+        def make_inventory_key(item_number, colour):
+            """
+            This is a special case that works for all sorts of Items
+            """
+            return '{}_{}'.format(item_number, colour)
 
-        _colours, _parts, _elements = {}, {}, {}
-        for c in Colour.objects.all():
-            _colours[c.number] = c
-        for p in Part.objects.all():
-            _parts[p.number] = p
-        for e in Element.objects.all().select_related('part', 'colour'):
-            _elements[e.lookup_key] = e
-
-        _set.inventory.all().delete()
-
-        # headers:
-        # Type	Item No	Item Name	Qty	Color ID	Extra?	Alternate?	Match ID	Counterpart?
-        lines = [l.strip().split('\t') for l in dat.split('\n')][2:]
-        for l in lines:
-            if not l or not l[0] or len(l) == 1:
+        item.inventory.all().delete()
+        inventory = {}
+        for item_type, item_number, item_name, quantity, colour, extra, alternate, match, counter in data:
+            # we really don't care about the weird crap, except extras which
+            # are handled below
+            if counter == 'Y' or alternate == 'Y':
                 continue
-            item_type, item_number, item_name, amount, colour, extra, alternate, match, counter = l
-            if item_type == 'P':
-                if not item_number in _parts:
-                   _parts[item_number] = Part.objects.create(name=item_name, number=item_number)
-                p = _parts[item_number]
 
-                colour = int(colour)
-                if not colour in _colours:
-                    _colours[colour] = Colour.objects.create(name='Unknown colour %d' % colour, number=colour)
+            quantity = int(quantity)
+            inv_key = make_inventory_key(item_number, colour)                
+            # if this a line for an extra part we'll just add it to the one
+            # we've already made since we really don't care about extras being
+            # extras
+            if inv_key in inventory:
+                ItemInventory.objects.filter(pk=inventory[inv_key].pk).update(quantity=F('quantity')+quantity)
+                continue
 
-                elem_key = '%s_%d' % (item_number, colour)
-                if not elem_key in _elements:
-                    _elements[elem_key] = Element.objects.create(part=p, colour=_colours[colour])
-                element = _elements[elem_key]
-                _set.inventory.create(element=element, amount=int(amount), is_extra=(extra == 'Y'),
-                                      is_alternate=(alternate == 'Y'), is_counterpart=(counter == 'Y'),
-                                      match_id=int(match))
+            kwargs = {'quantity': quantity}
+            if item_type == ItemType.PART:
+                kwargs['element'] = self.get_element(item_number, colour)
+            else:
+                kwargs['item'] = self.get_item(item_number)  
+
+            inventory[inv_key] = item.inventory.create(**kwargs)
 
     def parse_bricklink_order(dat):
         """

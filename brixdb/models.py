@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractBaseUser
 from django.contrib.postgres import fields as pgfields
 from django.db import models
 from django.template.defaultfilters import slugify
-from django.utils.translation import ugettext, ugettext_lazy as _
+from django.utils.translation import gettext, gettext_lazy as _
 
 from model_utils import Choices
 
@@ -41,6 +41,7 @@ class BricklinkCategory(models.Model):
 class Category(models.Model):
     parent = models.ForeignKey('self', related_name='sub_categories', blank=True, null=True, on_delete=models.CASCADE)
     name = models.CharField(max_length=256)
+    slug = models.SlugField(max_length=64, default='')
     # we use SET_NULL here in case BL does some stupid fuckery and we don't
     # want our whole database to go away if that happens
     bl_category = models.ForeignKey(BricklinkCategory, on_delete=models.SET_NULL, blank=True, null=True)
@@ -50,6 +51,9 @@ class Category(models.Model):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
 
 class CatalogItem(PolymorphicModel):
@@ -58,7 +62,7 @@ class CatalogItem(PolymorphicModel):
     item_type = models.CharField(max_length=16, default=TYPE.part, choices=TYPE)
     # name and number correspond to BL catalog for simplicity
     name = models.CharField(max_length=256)
-    number = models.CharField(max_length=32)
+    number = models.CharField(max_length=32, unique=True)
     no_inventory = models.BooleanField(default=False)
     year_released = models.PositiveIntegerField(blank=True, null=True)
     bl_id = models.PositiveIntegerField(default=0)
@@ -66,6 +70,7 @@ class CatalogItem(PolymorphicModel):
     weight = models.DecimalField(decimal_places=4, max_digits=9, blank=True, null=True)
     dimensions = models.CharField(max_length=64, blank=True, null=True)
 
+    # tlg_number = models.PositiveIntegerField(null=True)
     # most of TLG's names are horribly weird, but we'd like to keep track of them anyway
     tlg_name = models.CharField(max_length=256, blank=True, default='')
 
@@ -74,10 +79,6 @@ class CatalogItem(PolymorphicModel):
 
     def __str__(self):
         return self.name
-
-    def import_inventory(self):
-        from .service.bricklink import import_bricklink_inventory, fetch_bricklink_inventory
-        import_bricklink_inventory(self, fetch_bricklink_inventory(self))
 
 
 class Set(CatalogItem):
@@ -112,7 +113,7 @@ class Minifig(CatalogItem):
 
     class Meta:
         ordering = ('name',)
-    
+
     def save(self, *args, **kwargs):
         if not self.pk:
             self.item_type = self.TYPE.minifig
@@ -150,9 +151,12 @@ class Element(models.Model):
     """
     part = models.ForeignKey(Part, related_name='elements', on_delete=models.CASCADE)
     colour = models.ForeignKey(Colour, related_name='elements', on_delete=models.CASCADE)
-    lego_ids = pgfields.JSONField(default=list) 
+    lego_ids = pgfields.JSONField(default=list)
 
     objects = ElementQuerySet.as_manager()
+
+    class Meta:
+        unique_together = ('part', 'colour')
 
     def __str__(self):
         return '%s %s' % (self.colour, self.part)
@@ -160,12 +164,12 @@ class Element(models.Model):
     @property
     def lookup_key(self):
         return '%s_%d' % (self.part.number, self.colour.number)
-    
+
 
 class ItemInventory(models.Model):
     """
     Item inventories are tricky things since an Item can contain other Items
-    that in turn can contain other Items etc. 
+    that in turn can contain other Items etc.
     """
     part_of = models.ForeignKey(CatalogItem, related_name='inventory', on_delete=models.CASCADE)
     item = models.ForeignKey(CatalogItem, null=True, related_name='part_of', on_delete=models.CASCADE)
@@ -180,18 +184,17 @@ class ItemInventory(models.Model):
     match_id = models.PositiveIntegerField(blank=True, default=0)
 
     def __str__(self):
-        return '%dx %s' % (self.amount, self.element)
+        return "{qty} x {name}".format(qty=self.quantity, name=(self.element.name if self.element_id else self.item.name))
 
-    
 class ItemOwned(models.Model):
     """
     All sorts of items can be owned
     """
     owned_item = models.ForeignKey(CatalogItem, related_name='owners', on_delete=models.CASCADE)
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='sets_owned', on_delete=models.CASCADE)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='items_owned', on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
-    # XXX: state ? (parted out, MISB, deboxed, other?)
+    # XXX: state ? (used/new, parted out, MISB, deboxed, other?)
 
     def __str__(self):
         fmt_kw = {'quantity': self.quantity, 'name': self.owned_item.name, 'owner': self.owner}
-        return ugettext("{quantity} x %{name} owned by {owner}").format(**fmt_kw) 
+        return gettext("{quantity} x %{name} owned by {owner}").format(**fmt_kw)
