@@ -219,7 +219,7 @@ class BricklinkCatalogClient(object):
         should be enough.
         """
         file_name = os.path.join('base', 'sets_{date}.txt').format(date=date.today())
-        return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type='S')
+        return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.SET)
 
     def import_sets(self, data):
         """
@@ -241,9 +241,38 @@ class BricklinkCatalogClient(object):
                                                    defaults={'name': set_name, 'category': category, 'weight': weight,
                                                              'year_released': year, 'dimensions': dimensions})
 
+    def fetch_gear(self):
+        """
+        Fetch Bricklink's gear list. We'll just import them as Sets because we're lazy though
+        """
+        file_name = os.path.join('base', 'gear_{date}.txt').format(date=date.today())
+        return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.GEAR)
+
+    def import_gear(self, data):
+        """
+        Imports a gear list downloaded from Bricklink
+        """
+        if not BricklinkCategory.objects.exists():
+            # TODO: proper exception class here
+            raise Exception("Import Bricklink's categories first!")
+
+        for l in data:
+            category_id, category_name, set_number, set_name, year, weight, dimensions = l[:7]
+            
+            category = self.get_category(category_name)
+            # the set's number is least likely to change, though that _can_ also
+            # happen. because BL
+            weight = weight if weight != '?' else None
+            year = year if year.isdigit() else None
+            _set, _ = Set.objects.update_or_create(number=set_number,
+                                                   defaults={'name': set_name, 'category': category, 'weight': weight,
+                                                             'year_released': year, 'dimensions': dimensions,
+                                                             'item_type': CatalogItem.TYPE.gear})
+
+
     def fetch_parts(self):
         file_name = os.path.join('base', 'parts_{date}.txt').format(date=date.today())
-        return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type='P')
+        return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.PART)
 
     def import_parts(self, data):
         """

@@ -62,20 +62,31 @@ class CatalogItem(PolymorphicModel):
     item_type = models.CharField(max_length=16, default=TYPE.part, choices=TYPE)
     # name and number correspond to BL catalog for simplicity
     name = models.CharField(max_length=256)
-    number = models.CharField(max_length=32, unique=True)
+    number = models.CharField(max_length=32)
     no_inventory = models.BooleanField(default=False)
     year_released = models.PositiveIntegerField(blank=True, null=True)
-    bl_id = models.PositiveIntegerField(default=0)
 
+    # these might be useful probably
     weight = models.DecimalField(decimal_places=4, max_digits=9, blank=True, null=True)
     dimensions = models.CharField(max_length=64, blank=True, null=True)
 
-    # tlg_number = models.PositiveIntegerField(null=True)
+    # TODO: find out if bl_id is needed these days
+    bl_id = models.PositiveIntegerField(default=0)
+
+    # Brickset of course uses different numbers for at least things like the
+    # specific sets within series of CMFs
+    brickset_id = models.CharField(max_length=32, default='', blank=True)
+
+    # TLG has proper id numbers for everything it seems
+    tlg_number = models.PositiveIntegerField(null=True)
     # most of TLG's names are horribly weird, but we'd like to keep track of them anyway
     tlg_name = models.CharField(max_length=256, blank=True, default='')
 
     objects = PolymorphicManager.from_queryset(CatalogItemQuerySet)()
     all_objects = models.Manager()
+
+    class Meta:
+        unique_together = ('item_type', 'number')
 
     def __str__(self):
         return self.name
@@ -91,7 +102,8 @@ class Set(CatalogItem):
         return '%s %s' % (self.number, self.name)
 
     def save(self, *args, **kwargs):
-        if not self.pk:
+        # we treat gear as sets too, because that's just easier
+        if not self.pk and not self.item_type:
             self.item_type = self.TYPE.set
         super(Set, self).save(*args, **kwargs)
 
