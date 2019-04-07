@@ -13,7 +13,7 @@ from django.db.models import F
 import requests
 
 from ..models import (BricklinkCategory, CatalogItem, Category, Colour, Element, Part, Set, Minifig,
-                      ItemInventory)  
+                      ItemInventory)
 
 
 def fake_headers(url):
@@ -221,9 +221,9 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'sets_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.SET)
 
-    def import_sets(self, data):
+    def import_sets(self, data, item_type=Set.TYPE.set):
         """
-        Imports a set list downloaded from Bricklink
+        Imports a list of sets, gear or books downloaded from Bricklink.
         """
         if not BricklinkCategory.objects.exists():
             # TODO: proper exception class here
@@ -231,15 +231,29 @@ class BricklinkCatalogClient(object):
 
         for l in data:
             category_id, category_name, set_number, set_name, year, weight, dimensions = l[:7]
-            
             category = self.get_category(category_name)
             # the set's number is least likely to change, though that _can_ also
             # happen. because BL
             weight = weight if weight != '?' else None
             year = year if year.isdigit() else None
             _set, _ = Set.objects.update_or_create(number=set_number,
-                                                   defaults={'name': set_name, 'category': category, 'weight': weight,
-                                                             'year_released': year, 'dimensions': dimensions})
+                                                   defaults={'name': set_name, 'category': category,
+                                                             'weight': weight, 'year_released': year,
+                                                             'dimensions': dimensions, 'item_type': item_type})
+
+    def fetch_boooks(self):
+        """
+        Fetch Bricklink's book list. Like we do for gear we just treat them as
+        Sets for simplicity.
+        """
+        file_name = os.path.join('base', 'books_{date}.txt').format(date=date.today())
+        return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.BOOK)
+
+    def import_books(self, data):
+        """
+        Books are treated as sets.
+        """
+        self.import_sets(data, item_type=Set.TYPE.book)
 
     def fetch_gear(self):
         """
@@ -252,23 +266,7 @@ class BricklinkCatalogClient(object):
         """
         Imports a gear list downloaded from Bricklink
         """
-        if not BricklinkCategory.objects.exists():
-            # TODO: proper exception class here
-            raise Exception("Import Bricklink's categories first!")
-
-        for l in data:
-            category_id, category_name, set_number, set_name, year, weight, dimensions = l[:7]
-            
-            category = self.get_category(category_name)
-            # the set's number is least likely to change, though that _can_ also
-            # happen. because BL
-            weight = weight if weight != '?' else None
-            year = year if year.isdigit() else None
-            _set, _ = Set.objects.update_or_create(number=set_number,
-                                                   defaults={'name': set_name, 'category': category, 'weight': weight,
-                                                             'year_released': year, 'dimensions': dimensions,
-                                                             'item_type': CatalogItem.TYPE.gear})
-
+        self.import_sets(data, item_type=Set.TYPE.gear)
 
     def fetch_parts(self):
         file_name = os.path.join('base', 'parts_{date}.txt').format(date=date.today())
@@ -388,7 +386,7 @@ class BricklinkCatalogClient(object):
         if item_type:
             item = self.items.get(number, None)
             if not item or item.item_type != item_type:
-                fmt_kwargs = {'type': item_type, 'item': number, 'real_type': (item.item_type if item else None)} 
+                fmt_kwargs = {'type': item_type, 'item': number, 'real_type': (item.item_type if item else None)}
                 raise ValueError("Invalid item_type {type}! {item} is type {real_type}!".format(**fmt_kwargs))
         # this might not be good enough, but meh
         return self.items[number]
@@ -415,7 +413,7 @@ class BricklinkCatalogClient(object):
                 continue
 
             quantity = int(quantity)
-            inv_key = make_inventory_key(item_number, colour)                
+            inv_key = make_inventory_key(item_number, colour)
             # if this a line for an extra part we'll just add it to the one
             # we've already made since we really don't care about extras being
             # extras
@@ -427,7 +425,7 @@ class BricklinkCatalogClient(object):
             if item_type == ItemType.PART:
                 kwargs['element'] = self.get_element(item_number, colour)
             else:
-                kwargs['item'] = self.get_item(item_number)  
+                kwargs['item'] = self.get_item(item_number)
 
             inventory[inv_key] = item.inventory.create(**kwargs)
 

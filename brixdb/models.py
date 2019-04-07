@@ -57,7 +57,8 @@ class Category(models.Model):
 
 
 class CatalogItem(PolymorphicModel):
-    TYPE = Choices(('set', _('Set')), ('part', _('Part')), ('minifig', _('Minifig')), ('gear', _("Gear")))
+    TYPE = Choices(('set', _('Set')), ('part', _('Part')), ('minifig', _('Minifig')),
+                   ('gear', _("Gear")), ('book', _("Book")))
     category = models.ForeignKey(Category, related_name='items', on_delete=models.CASCADE)
     item_type = models.CharField(max_length=16, default=TYPE.part, choices=TYPE)
     # name and number correspond to BL catalog for simplicity
