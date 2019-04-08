@@ -199,6 +199,7 @@ class ItemInventory(models.Model):
     def __str__(self):
         return "{qty} x {name}".format(qty=self.quantity, name=(self.element.name if self.element_id else self.item.name))
 
+
 class ItemOwned(models.Model):
     """
     All sorts of items can be owned
