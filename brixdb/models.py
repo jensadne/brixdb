@@ -57,8 +57,10 @@ class Category(models.Model):
 
 
 class CatalogItem(PolymorphicModel):
-    TYPE = Choices(('set', _('Set')), ('part', _('Part')), ('minifig', _('Minifig')),
-                   ('gear', _("Gear")), ('book', _("Book")))
+    TYPE = Choices(('set', _('Set')), ('part', _('Part')), ('minifig', _("Minifig")),
+                   ('gear', _("Gear")), ('book', _("Book")), ('bricklink_order', _("Bricklink order")),
+                   ('lugbulk_order', _("Lugbulk order")), ('bulklot', _("Bulk lot")))
+
     category = models.ForeignKey(Category, related_name='items', on_delete=models.CASCADE)
     item_type = models.CharField(max_length=16, default=TYPE.part, choices=TYPE)
     # name and number correspond to BL catalog for simplicity
@@ -197,18 +199,73 @@ class ItemInventory(models.Model):
     match_id = models.PositiveIntegerField(blank=True, default=0)
 
     def __str__(self):
-        return "{qty} x {name}".format(qty=self.quantity, name=(self.element.name if self.element_id else self.item.name))
+        return "{qty} x {name}".format(qty=self.quantity, name=(str(self.element) if self.element_id else self.item.name))
 
 
-class ItemOwned(models.Model):
+class OwnedItem(models.Model):
     """
     All sorts of items can be owned
     """
-    owned_item = models.ForeignKey(CatalogItem, related_name='owners', on_delete=models.CASCADE)
-    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='items_owned', on_delete=models.CASCADE)
+    item = models.ForeignKey(CatalogItem, related_name='owners', on_delete=models.CASCADE)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='owned_items', on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     # XXX: state ? (used/new, parted out, MISB, deboxed, other?)
 
     def __str__(self):
-        fmt_kw = {'quantity': self.quantity, 'name': self.owned_item.name, 'owner': self.owner}
-        return gettext("{quantity} x %{name} owned by {owner}").format(**fmt_kw)
+        fmt_kw = {'quantity': self.quantity, 'name': self.item.name, 'owner': self.owner}
+        return gettext("{quantity} x {name} owned by {owner}").format(**fmt_kw)
+
+
+class BricklinkOrder(CatalogItem):
+    """
+    We treat Bricklink orders like any other CatalogItem, apart from ownership
+    being limited.
+    """
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='bricklink_orders', on_delete=models.CASCADE)
+    ordered = models.DateTimeField(blank=True, null=True)
+
+    # no idea if these are relevant to store, but why not..
+    seller_username = models.CharField(max_length=256, blank=True, default='')
+    price = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=9)
+    shipping = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=9)
+    fees = models.DecimalField(blank=True, null=True, decimal_places=2, max_digits=9)
+    currency = models.CharField(max_length=3, blank=True, default='')
+
+    class Meta:
+        ordering = ('number',)
+
+    def __str__(self):
+        return _("Bricklink order #{number}").format(number=self.number)
+
+
+class LugbulkOrder(CatalogItem):
+    """
+    We treat Lugbulk orders like any other CatalogItem, apart from ownership
+    being limited.
+    """
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='lugbulk_orders', on_delete=models.CASCADE)
+    # since back in the day (2010) there were two rounds of Lugbulk ordering in
+    # the same year we can't just store the year as an integer here.
+    period = models.CharField(max_length=8)
+
+    class Meta:
+        ordering = ('period', 'owner')
+
+    def __str__(self):
+        return _("Lugbulk order {owner} - {period}").format(owner=self.owner, period=self.period)
+
+
+class BulkLot(CatalogItem):
+    """
+    Generic model for grouping together stuff in a lot. Used for amongst other
+    things PaB orders, project support orders, brick boxes, assorted other
+    random things that are not covered by anything else, etc
+    """
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='bulk_lots', on_delete=models.CASCADE)
+    acquired = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ('name', 'owner')
+
+    def __str__(self):
+        return _("Bulk lot: {name}").format(name=self.name)

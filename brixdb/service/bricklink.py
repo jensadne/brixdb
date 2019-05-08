@@ -43,6 +43,11 @@ class ItemType:
     SET = 'S'
 
 
+item_type_mapper = {ItemType.BOOK: CatalogItem.TYPE.book, ItemType.GEAR: CatalogItem.TYPE.gear,
+                    ItemType.MINIFIG: CatalogItem.TYPE.minifig, ItemType.PART: CatalogItem.TYPE.part,
+                    ItemType.SET: CatalogItem.TYPE.set}
+
+
 class BricklinkCatalogClient(object):
     """
     """
@@ -381,15 +386,17 @@ class BricklinkCatalogClient(object):
         too, for importing Bricklink orders
         """
         if self.items is None:
-            self.items = {item.number: item for item in CatalogItem.objects.all()}
+            self.items = {'{}_{}'.format(item.item_type, item.number): item for item in CatalogItem.objects.all()}
         # later we might want to do this in a more sensible way..
-        if item_type:
-            item = self.items.get(number, None)
-            if not item or item.item_type != item_type:
-                fmt_kwargs = {'type': item_type, 'item': number, 'real_type': (item.item_type if item else None)}
-                raise ValueError("Invalid item_type {type}! {item} is type {real_type}!".format(**fmt_kwargs))
-        # this might not be good enough, but meh
-        return self.items[number]
+        # TODO: item_type kwarg really must be required for this to work
+        key = '{}_{}'.format(item_type, number)
+        item = self.items.get(key, None)
+        if not item:
+            fmt_kwargs = {'type': item_type, 'item': number, 'real_type': (item.item_type if item else None)}
+            raise ValueError("Invalid item_type {type}! {item} is type {real_type}!".format(**fmt_kwargs))
+        else:
+            self.items[key] = item
+        return self.items[key]
 
     def import_inventory(self, item, data):
         """
@@ -404,6 +411,7 @@ class BricklinkCatalogClient(object):
             """
             return '{}_{}'.format(item_number, colour)
 
+        # ensure we get a fresh copy
         item.inventory.all().delete()
         inventory = {}
         for item_type, item_number, item_name, quantity, colour, extra, alternate, match, counter in data:
@@ -425,7 +433,7 @@ class BricklinkCatalogClient(object):
             if item_type == ItemType.PART:
                 kwargs['element'] = self.get_element(item_number, colour)
             else:
-                kwargs['item'] = self.get_item(item_number)
+                kwargs['item'] = self.get_item(item_number, item_type=item_type_mapper[item_type])
 
             inventory[inv_key] = item.inventory.create(**kwargs)
 
