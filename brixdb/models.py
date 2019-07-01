@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.contrib.auth.models import AbstractBaseUser
+from django.contrib.auth.models import AbstractBaseUser, UserManager
 from django.contrib.postgres import fields as pgfields
 from django.db import models
 from django.template.defaultfilters import slugify
@@ -20,8 +20,20 @@ class User(AbstractBaseUser):
     USERNAME_FIELD = 'email'
     EMAIL_FIELD = 'email'
 
+    objects = UserManager()
+
+    # ugly, temp
+    is_staff = True
+    is_superuser = True
+
     def __str__(self):
         return self.name if self.name else self.email.split('@')[0]
+
+    def has_module_perms(self, app_label):
+        return self.is_superuser
+
+    def has_perm(self, codename):
+        return self.is_superuser
 
 
 class BricklinkCategory(models.Model):
@@ -73,8 +85,9 @@ class CatalogItem(PolymorphicModel):
     weight = models.DecimalField(decimal_places=4, max_digits=9, blank=True, null=True)
     dimensions = models.CharField(max_length=64, blank=True, null=True)
 
-    # TODO: find out if bl_id is needed these days
-    bl_id = models.PositiveIntegerField(default=0)
+    # Bricklink's internal id is used for querying certain things, so it must
+    # be stored
+    bl_id = models.PositiveIntegerField(default=0, null=True, blank=True)
 
     # Brickset of course uses different numbers for at least things like the
     # specific sets within series of CMFs
@@ -199,7 +212,8 @@ class ItemInventory(models.Model):
     match_id = models.PositiveIntegerField(blank=True, default=0)
 
     def __str__(self):
-        return "{qty} x {name}".format(qty=self.quantity, name=(str(self.element) if self.element_id else self.item.name))
+        return "{qty} x {name}".format(qty=self.quantity,
+                                       name=(str(self.element) if self.element_id else self.item.name))
 
 
 class OwnedItem(models.Model):
