@@ -1,13 +1,12 @@
 from django.conf.urls import url
 
+from rest_framework.routers import DefaultRouter
+
 from . import views
 
-
-# TODO: get rid of these
-urlpatterns = [
-    url('^part/(?P<number>\w+)/$', views.part_index, name='part-detail'),
-    url('^set/(?P<slug>.+)/$', views.SetView.as_view(), name='set-detail'),
-
-    url(r'^colour/(?P<slug>.+)/not-owned/$', views.ColourDetail.as_view(), {'owned': False}, name='colour-not-owned'),
-    url(r'^colour/(?P<slug>.+)/$', views.ColourDetail.as_view(), name='colour-detail'),
-]
+router = DefaultRouter()
+router.register(r'set', views.SetViewSet, basename='set')
+router.register(r'element', views.ElementViewSet, basename='element')
+router.register(r'colour', views.ColourViewSet, basename='colour')
+router.register(r'part', views.PartViewSet, basename='part')
+urlpatterns = router.urls

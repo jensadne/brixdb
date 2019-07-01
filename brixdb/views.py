@@ -1,31 +1,71 @@
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from django.utils.translation import ugettext as _
 from django.views.generic.detail import DetailView
 from django.views.decorators.http import require_POST
 
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from . import serializers
 from .forms import SimpleIntegerForm
-from .models import Colour, Element, Set
+from .models import Colour, Element, Set, Part
+from .service import bricklink, bricksnpieces
 
 
-def part_index(request, number):
-    template, c = 'brixdb/part_index.html', {}
-    return render(request, template, c)
+import q
+
+class SetViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_field = 'number'
+    queryset = Set.objects.all()
+    serializer_class = serializers.SetSerializer
 
 
-class ColourDetail(DetailView):
-    template_name = 'brixdb/colour_detail.html'
-    model = Colour
+class PartViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_field = 'number'
+    queryset = Part.objects.all().prefetch_related('elements', 'elements__colour')
+    serializer_class = serializers.PartDetailSerializer
 
-    def get_context_data(self, object):
-        context = super(ColourDetail, self).get_context_data()
-        #context['colour'] = colour = get_object_or_404(Colour, slug=self.kwargs['slug'])
-        if self.request.user.is_authenticated():
-            owned = self.kwargs.get('owned', True)
-            context['owned_parts'] = Element.objects.by_colour(object).for_user(self.request.user, owned=owned
-                                            ).select_related('part').order_by('part__name')
-        return context
+
+class ColourViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_field = 'slug'
+    queryset = Colour.objects.all()
+    serializer_class = serializers.ColourSerializer
+
+
+class ElementViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_field = 'pk'
+    queryset = Element.objects.all()
+    serializer_class = serializers.ElementSerializer
+
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated])
+    def owned(self, request):
+        elements = Element.objects.owned_by(request.user).select_related('part', 'colour')
+        serializer = self.get_serializer(elements, many=True)
+        return Response(serializer.data)
+
+    # TODO: ensure we can get a pk from frontend and make this a detail action
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated])
+    def bricklink_prices(self, request):
+        """
+        Fetch cheapest price from Bricklink for the given Element.
+        """
+        element = get_object_or_404(self.queryset, lego_ids__contains=q(int(request.query_params.get('element', 0))))
+        prices = bricklink.get_element_prices(element)
+        # we only care about the cheapest for this check
+        return Response(prices[0])
+
+    # TODO: ensure we can get a pk from frontend and make this a detail action
+    @action(methods=['get'], detail=False, permission_classes=[IsAuthenticated])
+    def bricksnpieces_prices(self, request):
+        """
+        Fetch B&P price for the given Element
+        """
+        element = get_object_or_404(self.queryset, lego_ids__contains=q(int(request.query_params.get('element', 0))))
+        price = bricksnpieces.get_element_prices(element)
+        return Response(price)
 
 
 @require_POST

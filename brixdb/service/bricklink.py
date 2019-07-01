@@ -322,14 +322,31 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'elements_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.ELEMENTS, file_name, item_type=ItemType.SET)
 
-    def import_elements(self, data):
+    def import_elements(self, data, blacklist=None):
         """
         Import Bricklink's list of part+colour combinations and create Elements
         for them. This needs to handle cases of multiple element-ids from TLG
         for the same part+colour combination since Bricklink doesn't consider
         those separate, and neither do we.
         """
-        pass
+        # BL have in their infinite wisdom decided to have some minifigs in the
+        # list of elements..
+        blacklist = blacklist if blacklist else {}
+        colours = {c.name: c for c in Colour.objects.all()}
+        elements = {}
+        for element in Element.objects.select_related('colour', 'part'):
+            for element_id in element.lego_ids:
+                elements[element_id] = element
+        for part_number, colour_name, element_id in data:
+            if part_number in blacklist:
+                continue
+            element_id = int(element_id)
+            element = elements.get(element_id)
+            if element and element.part.number == part_number and element_id in element.lego_ids:
+                continue
+            element = self.get_element(part_number, colours[colour_name].number)
+            element.lego_ids.append(element_id)
+            element.save()
 
     def fetch_inventory(self, item):
         """
@@ -374,7 +391,7 @@ class BricklinkCatalogClient(object):
         elem_key = '{}_{}'.format(number, colour.number)
         # this on the other hand can probably happen, so we have to handle it
         element = self.elements.get(elem_key)
-        if element == None:
+        if element is None:
             part = self.get_item(number, item_type=CatalogItem.TYPE.part)
             self.elements[elem_key] = element = Element.objects.get_or_create(part=part, colour=colour)[0]
         return element
@@ -392,6 +409,7 @@ class BricklinkCatalogClient(object):
         key = '{}_{}'.format(item_type, number)
         item = self.items.get(key, None)
         if not item:
+            # try doing an extra lookup in case the item is of a different 
             fmt_kwargs = {'type': item_type, 'item': number, 'real_type': (item.item_type if item else None)}
             raise ValueError("Invalid item_type {type}! {item} is type {real_type}!".format(**fmt_kwargs))
         else:
@@ -460,7 +478,7 @@ class BricklinkCatalogClient(object):
                 order_number = int(line_match.groups()[1])
                 break
         if not order_number:
-                return False, 'invalid data, no order number'
+            return False, 'invalid data, no order number'
 
         sets, parts = [], []
 
@@ -514,3 +532,78 @@ class BricklinkCatalogClient(object):
 
         set_.inventory.create(element=elem, amount=quantity)
         return True, set_
+
+
+def get_store_inventory(username):
+    """
+    Fetches the inventory of the Bricklink store with the given username.
+    """
+    # 1: fetch the whole store front (because BL sucks)
+    front_url = 'https://store.bricklink.com/{username}#/shop?o={opts}'.format(username=username,
+                                                                               opts='{%22showHomeItems%22:1}')
+    headers = fake_headers(front_url)
+    r = requests.get(front_url, headers=headers)
+    if r.status_code != 200:
+        return []
+    # 2: find the JavaScript blob with the store config
+    t = r.text
+    base_idx = t.index('var StoreFront = {}')
+    start = t.find('StoreFront.store', base_idx, len(t))
+    end = t.find('StoreFront.user', base_idx, len(t))
+    jsblob = t[start:end]
+    # 3: find the actual store id
+    id_start = jsblob.find('id: ')
+    id_end = jsblob.find(',', id_start, -1)
+    store_id = jsblob[id_start:id_end].replace('id:', '').replace(' ', '').replace('\t', '')
+
+    # 4: do a number of fetches to get the whole parts inventory (we ignore
+    # other item types for now)
+    all_items = []
+    inventory_url = 'https://store.bricklink.com/ajax/clone/store/searchitems.ajax?pgSize=100&itemType=P&showHomeItems=0&sid={store_id}'.format(store_id=store_id)  # noqa
+    r = requests.get(inventory_url, headers=headers)
+    if r.status_code != 200:
+        return all_items
+    groups = r.json()['result']['groups']
+    total = groups[0]['total']
+    all_items = groups[0]['items']
+    # calculate number of pages and do all the remaining fetches
+    pages = total / 100
+    pages = int(pages) + (1 if pages - int(pages) else 0)
+    if not all_items or pages <= 1:
+        return all_items
+
+    for i in range(2, pages+1):
+        r = requests.get(inventory_url+('&pg={}'.format(i)), headers=headers)
+        if r.status_code != 200:
+            return all_items
+        groups = r.json()['result']['groups']
+        all_items.extend(groups[0]['items'])
+    return all_items
+
+
+def get_element_prices(element, desired_quantity=1):
+    """
+    Fetches price information for the given Element from Bricklink 
+    """
+    part, colour = element.part, element.colour
+    base_url = 'https://www.bricklink.com/v2/catalog/catalogitem.page?P={number}'.format(number=part.number)
+    headers = fake_headers(base_url)
+    # 0: find bl_id for the part if we don't have it already
+    if not element.part.bl_id:
+        response = requests.get(base_url, headers=headers)
+        if response.status_code != 200:
+            return []
+        match = re.search(r'var\s+_var_item\s+=\s+{\s+idItem:\s+(\d+)', response.text)  
+        if not match:
+            return [] 
+        part.bl_id = match.groups()[0]
+        part.save()
+
+    prices_url = 'https://www.bricklink.com/ajax/clone/catalogifs.ajax?itemid={item_id}&color={colour_id}&iconly=0'
+    response = requests.get(prices_url.format(item_id=part.bl_id, colour_id=colour.number), headers=headers)
+    if response.status_code != 200:
+        return []
+    items = response.json()['list']
+    return [{'price': float(item['mDisplaySalePrice'].split(' ')[1]), 'storeName': item['strStorename'],
+             'country': item['strSellerCountryCode'], 
+             'storeUsername': item['strSellerUsername'], 'quantity': item['n4Qty']} for item in items]
