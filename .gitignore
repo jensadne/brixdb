@@ -4,3 +4,4 @@ docs/_*
 *.swo
 /test_project/bricklink
 /test_project/brixdb
+/test_project/*.txt
