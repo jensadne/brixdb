@@ -32,7 +32,11 @@ class PartViewSet(viewsets.ReadOnlyModelViewSet):
 class ColourViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'slug'
     queryset = Colour.objects.all()
-    serializer_class = serializers.ColourSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return serializers.ColourDetailSerializer
+        return serializers.ColourSerializer
 
 
 class ElementViewSet(viewsets.ReadOnlyModelViewSet):

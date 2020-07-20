@@ -4,10 +4,13 @@ from . import models
 
 
 class SetSerializer(serializers.HyperlinkedModelSerializer):
+    year = serializers.IntegerField(source='year_released')
+    pieces = serializers.IntegerField(source='year_released')
+
     class Meta:
         model = models.Set
         lookup_field = 'number'
-        fields = ('number', 'name', )
+        fields = ('number', 'name', 'year', 'pieces')
 
 
 class PartSerializer(serializers.HyperlinkedModelSerializer):
@@ -22,6 +25,15 @@ class ColourSerializer(serializers.HyperlinkedModelSerializer):
         model = models.Colour
         lookup_field = 'slug'
         fields = ('pk', 'slug', 'name')
+
+
+class ColourDetailSerializer(serializers.HyperlinkedModelSerializer):
+    parts = PartSerializer(many=True) 
+
+    class Meta:
+        model = models.Colour
+        lookup_field = 'slug'
+        fields = ('pk', 'slug', 'name', 'parts')
 
 
 class ElementSerializer(serializers.HyperlinkedModelSerializer):

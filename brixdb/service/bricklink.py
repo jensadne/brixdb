@@ -2,24 +2,32 @@
 Service functions for dealing with Bricklink. Much uglyness due to Bricklink
 not exposing things sensibly.
 """
-from datetime import date
+import email
 import html
+import imaplib
 import os
 import re
+from datetime import date
 
 from django.conf import settings
-from django.db.models import F
+from django.db.models import F, Q
+from django.template.defaultfilters import slugify
 
 import requests
 
 from ..models import (BricklinkCategory, CatalogItem, Category, Colour, Element, Part, Set, Minifig,
                       ItemInventory)
 
+# Bricklink have at some point changed the syntax for the order
+# confirmation subject, so we must look for both variations to get the
+# order id from the subject
+order_number_old_re = re.compile(r'^BrickLink Order #(\d+) - ', re.IGNORECASE)
+order_number_new_re = re.compile(r'^Order Confirmed: .*\((\d+)\)', re.IGNORECASE)
+
 
 def fake_headers(url):
     """
-    Bricklink is stupid and thinks referrer and user-agent checks are
-    worthwhile in this day and age..
+    Bricklink does referrer and user-agent checks so we need to fake those.
     """
     return {'referrer': url, 'User-agent': 'Mozilla/5.0'}
 
@@ -69,9 +77,8 @@ class BricklinkCatalogClient(object):
         """
         url = 'https://www.bricklink.com/ajax/renovate/loginandout.ajax'
         session = requests.Session()
-        data = {'userid': settings.BRICKLINK_USERNAME, 'password': settings.BRICKLINK_PASSWORD,
-                'keepme_loggedin': False, 'mid': '168ceb4f73700000-a25f3a8ad3ebeb5f',
-                'pageid': 'MAIN'}
+        data = {'userid': settings.BRIXDB['BRICKLINK_USERNAME'], 'password': settings.BRIXDB['BRICKLINK_PASSWORD'],
+                'keepme_loggedin': False, 'mid': '168ceb4f73700000-a25f3a8ad3ebeb5f', 'pageid': 'MAIN'}
         session.post(url, data, headers=fake_headers(url))
         # some of the cookies seem to only be set on the first visit, so for
         # simplicity we just fetch the colours list here. In the Future(tm) we'll
@@ -106,7 +113,7 @@ class BricklinkCatalogClient(object):
 
         # there's one row of headers so slice that off, and a varying number of
         # empty lines before the data starts so get rid of those too
-        lines = [l.strip().split('\t') for l in response.split('\n') if l.strip()][1:]
+        lines = [line.strip().split('\t') for line in response.split('\n') if line.strip()][1:]
         return lines
 
     def fetch_categories(self):
@@ -142,7 +149,7 @@ class BricklinkCatalogClient(object):
         # another bonkers case, BL's category names in several lists (at least
         # sets and minifigs) are the complete branch of the tree-that-isn't-a
         # tree, so to get our _actual_ category we must construct the full
-        # dotted bl_id from the category names, separated by /, then and use
+        # dotted bl_id from the category names, separated by /, and then use
         # that to find the proper category, if necessary creating the whole
         # branch
         if self.bl_categories is None:
@@ -214,9 +221,9 @@ class BricklinkCatalogClient(object):
         Headers:
         Color ID	Color Name	RGB	Type	Parts	In Sets	Wanted	For Sale	Year From	Year To
         """
-        for l in data:
-            colour_id, colour_name = int(l[0]), l[1]
-            colour, _ = Colour.objects.update_or_create(number=colour_id, defaults={'name': colour_name})
+        for line in data:
+            colour_id, colour_name = int(line[0]), line[1]
+            Colour.objects.update_or_create(number=colour_id, defaults={'name': colour_name})
 
     def fetch_sets(self):
         """
@@ -234,8 +241,8 @@ class BricklinkCatalogClient(object):
             # TODO: proper exception class here
             raise Exception("Import Bricklink's categories first!")
 
-        for l in data:
-            category_id, category_name, set_number, set_name, year, weight, dimensions = l[:7]
+        for line in data:
+            category_id, category_name, set_number, set_name, year, weight, dimensions = line[:7]
             category = self.get_category(category_name)
             # the set's number is least likely to change, though that _can_ also
             # happen. because BL
@@ -286,7 +293,7 @@ class BricklinkCatalogClient(object):
         """
         for category_id, category_name, number, name, weight, dimensions in data:
             weight = weight if weight != '?' else None
-            defaults = {'name': name, 'category': self.get_category(category_name),
+            defaults = {'name': name[:256], 'category': self.get_category(category_name),
                         'weight': weight, 'dimensions': dimensions}
             part, _ = Part.objects.update_or_create(number=number, defaults=defaults)
 
@@ -360,15 +367,20 @@ class BricklinkCatalogClient(object):
         return self.fetch_catalog_file(ViewType.INVENTORY, file_name, item_number=item.number, item_type=item_type,
                                        item_type_inv=item_type)
 
-    def get_colour(self, number):
+    def get_colour(self, number=None, name=None):
         """
         Not 100% if we need this, but might as well have it. Since getting an
         unknown colour out of the blue is highly unlikely we don't bother with
         clever error handling here.
         """
         if not self.colours:
-            self.colours = {colour.number: colour for colour in Colour.objects.all()}
-        return self.colours[int(number)]
+            self.colours = {}
+            for colour in Colour.objects.all():
+                self.colours[colour.number] = colour
+                self.colours[colour.name] = colour
+        # NOTE: we crash here if given an invalid number, while lookups by name
+        #       are allowed to fail.
+        return self.colours[int(number)] if number else self.colours.get(name, None)
 
     def get_element_key(self, number, colour):
         """
@@ -392,26 +404,44 @@ class BricklinkCatalogClient(object):
         # this on the other hand can probably happen, so we have to handle it
         element = self.elements.get(elem_key)
         if element is None:
-            part = self.get_item(number, item_type=CatalogItem.TYPE.part)
+            part = self.get_part(number)
             self.elements[elem_key] = element = Element.objects.get_or_create(part=part, colour=colour)[0]
         return element
 
-    def get_item(self, number, name=None, item_type=None):
+    def get_minifig(self, number=None, name=None):
+        return self.get_item(CatalogItem.TYPE.minifig, number=number, name=name)
+
+    def get_part(self, number=None, name=None):
+        return self.get_item(CatalogItem.TYPE.part, number=number, name=name)
+
+    def get_set(self, number=None, name=None):
+        return self.get_item(CatalogItem.TYPE.set, number=number, name=name)
+
+    def get_item(self, item_type, number=None, name=None, ):
         """
         Whenever we're not adding an Element to the Item's inventory we use
         this method. Later we intend to extend this to handle lookups by name
-        too, for importing Bricklink orders
+        too, for importing Bricklink orders.
         """
-        if self.items is None:
-            self.items = {'{}_{}'.format(item.item_type, item.number): item for item in CatalogItem.objects.all()}
         # later we might want to do this in a more sensible way..
+        if self.items is None:
+            self.items = {}
+            for item in CatalogItem.objects.all():
+                self.items['{}_{}'.format(item.item_type, item.number)] = item
+                self.items['{}_{}'.format(item.item_type, slugify(item.name))] = item
+                for other_name in item.other_names:
+                    self.items['{}_{}'.format(item.item_type, slugify(other_name))] = item
         # TODO: item_type kwarg really must be required for this to work
-        key = '{}_{}'.format(item_type, number)
+        key = '{}_{}'.format(item_type, (number if number else slugify(name)))
         item = self.items.get(key, None)
         if not item:
-            # try doing an extra lookup in case the item is of a different 
-            fmt_kwargs = {'type': item_type, 'item': number, 'real_type': (item.item_type if item else None)}
-            raise ValueError("Invalid item_type {type}! {item} is type {real_type}!".format(**fmt_kwargs))
+            # we allow failures when doing lookup by name, this because we
+            # can't know how many words of a line in an email from Bricklink
+            # actually are the item name
+            if name:
+                return None
+            # try doing an extra lookup in case the item is of a different type?
+            raise ValueError("Invalid number {num} for item_type {typ}!".format(num=number, typ=item_type))
         else:
             self.items[key] = item
         return self.items[key]
@@ -451,17 +481,20 @@ class BricklinkCatalogClient(object):
             if item_type == ItemType.PART:
                 kwargs['element'] = self.get_element(item_number, colour)
             else:
-                kwargs['item'] = self.get_item(item_number, item_type=item_type_mapper[item_type])
-
+                kwargs['item'] = self.get_item(item_type=item_type_mapper[item_type], number=item_number)
             inventory[inv_key] = item.inventory.create(**kwargs)
 
-    def parse_bricklink_order(dat):
+    def parse_bricklink_order_email(self, msg):
         """
-        Parses an order confirmation email from Bricklink.
+        Parses an order confirmation email from Bricklink, `msg` should be a
+        Message object from Python's email package.
         """
-        order_number_re = re.compile(r'^Subject:( )*Bricklink Order #(\d+)', re.IGNORECASE)
+        # Subject:( )*Bricklink Order #(\d+)', re.IGNORECASE)
+
+        # all lines for order content, regardless of type, starts with either "[New" or "[Used"
+        is_content_re = re.compile(r'^\[(New|Used)', re.IGNORECASE)
         part_content_re = re.compile(r'^\[(?P<state>New|Used)\] (?P<part_name>.*)  \(x(?P<quantity>\d+)\)')
-        set_content_re = re.compile(r'^\[(?P<state>New|Used) (?P<state2>Sealed|Complete|Incomplete)\] (?P<set_number>\d+)  \(x(?P<quantity>\d+)\)')  # noqa
+        set_content_re = re.compile(r'^\[(?P<state>New|Used) (?P<state2>Sealed|Complete|Incomplete)\] (?P<set_number>\S+)  \(x(?P<quantity>\d+)\)')  # noqa
 
         def is_set(line):
             return set_content_re.match(line)
@@ -469,68 +502,128 @@ class BricklinkCatalogClient(object):
         def is_part(line):
             return part_content_re.match(line)
 
-        lines = dat.split('\n')
+        def is_gear(line):
+            return False
+
+        def is_minifig(colour_and_item):
+            """
+            Determine if the given colour_and_item string (which usually is a
+            colour and a part name) is most likely to be a Minifig.
+            """
+            tokens = colour_and_item.split(' ')
+            # If there isn't a Colour that has, or has had, a name that starts
+            # with the first word we can safely assume this isn't a Colour and
+            # try to treat it as a Minifig. This obviously won't work for
+            # content lines that are sets, but they should already be handled
+            # by the time we check for minifigs.
+            if not Colour.objects.filter(Q(name__istartswith=tokens[0]) |
+                                         Q(other_names__0__istartswith=tokens[0])).exists():
+                return True
+
+            # TODO: do copious amounts of magic to determine whether a line is
+            #       a part with colour, or a minifig with a name that starts
+            #       with a valid colour name, such as "Black Widow".
+            return False
+
         # find order number
         order_number = None
-        for line in lines:
-            line_match = order_number_re.match(line)
-            if line_match:
-                order_number = int(line_match.groups()[1])
-                break
-        if not order_number:
+        subject = str(msg['Subject'])
+        old_match, new_match = order_number_old_re.match(subject), order_number_new_re.match(subject)
+        if old_match:
+            order_number = int(old_match.groups()[0])
+        elif new_match:
+            order_number = int(new_match.groups()[0])
+        else:
+            # TODO: error handling
             return False, 'invalid data, no order number'
 
-        sets, parts = [], []
+        # time to start parsing the payload
+        content_lines = []
+        lines = msg.get_payload().split('\n')
+        for line in lines:
+            if is_content_re.match(line):
+                content_lines.append(line)
+        print(len(content_lines), 'content lines')
 
-        # find start and end of order contents
-        content_start, content_end = None, None
-        for i, line in enumerate(lines):
-            if line.startswith('Items in Order:'):
-                content_start = i + 2
-            if line.startswith('Buyer Information:'):
-                content_end = i - 2
+        sets, parts, minifigs = [], [], []
+        for line in content_lines:
+            print(line)
+            # first see if it's looks like a Set as that's easiset to handle
+            set_match = is_set(line)
+            print('Set match:', bool(set_match))
+            if set_match:
+                groups = set_match.groupdict()
+                state, number, quantity = groups['state'], groups['set_number'], int(groups['quantity'])
+                sets.append(self.get_set(number=number))
+                continue
 
-        if content_start is None or content_end is None:
-            return False, 'invalid data, content not found'
-
-        colours = {}
-        for colour in Colour.objects.all():
-            colours[colour.name] = colour
-
-        # see what the order actually contains
-        for line in lines[content_start:content_end]:
-            content_match = part_content_re.match(line)
-            if content_match:
-                groups = content_match.groupdict()
-                state, part_info, quantity = groups['state'], groups['part_info'], int(groups['quantity'])
-                colour, part_name = find_colour_part(part_info)
-                try:
-                    part = Part.objects.get(name=part_name)
-                except Part.DoesNotExist:
-                    print('NOT FOUND', part_name)
+            # evidently not a Set, see if it's a Part instead (which might also
+            # be a Minifig because Bricklink)
+            part_match = is_part(line)
+            print('Part match:', bool(part_match))
+            if part_match:
+                groups = part_match.groupdict()
+                state, colour_and_item, quantity = groups['state'], groups['part_name'], int(groups['quantity'])
+                if is_minifig(colour_and_item):
+                    minifigs.append((self.get_minifig(name=colour_and_item), quantity))
                     continue
-                #print colour, part
-                elem, created = Element.objects.get_or_create(part=part, colour=colour)
-                if created:
-                    elem.save()
-                parts.append(elem)
-        return {'number': number, 'parts': parts, 'sets': sets}
 
-    def import_bricklink_order(owner, dat):
+                # we have concluded that this must be a Part, so we must find
+                # the colour and part name
+                print(f'State: {state}\nPart: {colour_and_item}\nQuantity: {quantity}\n\n')
+                colour, part_name, tokens, part_offset, part = None, '', colour_and_item.split(' '), 0, None
+                print(tokens)
+                colour_name = tokens[0]
+                for i, token in enumerate(tokens[1:]):
+                    # add the next token to colour_name until we find a Colour
+                    colour = self.get_colour(name=colour_name)
+                    if colour:
+                        # if we have found a valid colour we stop looking for
+                        # colour and save the position for starting to look for
+                        # the Part in the next loop
+                        part_offset = i + 1
+                        break
+                    colour_name += (' {}'.format(token))
+
+                # if we've gotten here without finding a colour something is very wrong
+                if not colour:
+                    return False, 'invalid line encountered, colour name: {}'.format(colour_name)
+
+                # then we look for a part in the remaining tokens
+                tokens = tokens[part_offset:]
+                while tokens:
+                    # we start by looking for the whole remainder as a part
+                    # name and cut off one word each iteration until we find
+                    # something. in most cases we'll find it on the first
+                    # lookup so this isn't as stupid as it looks.
+                    part_name = ' '.join(tokens)
+                    print(part_name)
+                    part = self.get_part(name=part_name)
+                    if part:
+                        break
+                    tokens.pop(-1)
+
+                if part:
+                    element = self.get_element(number=part.number, colour=colour.number)
+                    parts.append((element, quantity))
+                else:
+                    # TODO: handle unknown parts
+                    print(f'Part not found: {part_name}')
+
+        return True, {'order_number': order_number, 'parts': parts, 'sets': sets, 'minifigs': minifigs}
+
+    def import_bricklink_order(owner, number, parts, sets):
         """
         Parses an order confirmation email from Bricklink and imports it as a "Set"
         owned by "owner"
         """
-        cat, created = Category.objects.get_or_create(name='__Bricklink order', bl_id=9999)
-        if created:
-            cat.save()
-
-        set_ = Set.objects.create(name='Bricklink order #%d' % order_number, category=cat,
-                                  number='__blorder%d' % order_number)
+        cat = Category.objects.get_or_create(name='__Bricklink order', bl_id=9999)[0]
+        set_ = Set.objects.create(name='Bricklink order #{}'.format(number), category=cat,
+                                  number='__blorder%d' % number)
         owner.sets_owned.create(owned_set=set_)
         # XXX: store price of order?
-
-        set_.inventory.create(element=elem, amount=quantity)
+        for element, quantity in parts:
+            set_.inventory.create(element=element, amount=quantity)
         return True, set_
 
 
@@ -583,7 +676,7 @@ def get_store_inventory(username):
 
 def get_element_prices(element, desired_quantity=1):
     """
-    Fetches price information for the given Element from Bricklink 
+    Fetches price information for the given Element from Bricklink
     """
     part, colour = element.part, element.colour
     base_url = 'https://www.bricklink.com/v2/catalog/catalogitem.page?P={number}'.format(number=part.number)
@@ -593,9 +686,9 @@ def get_element_prices(element, desired_quantity=1):
         response = requests.get(base_url, headers=headers)
         if response.status_code != 200:
             return []
-        match = re.search(r'var\s+_var_item\s+=\s+{\s+idItem:\s+(\d+)', response.text)  
+        match = re.search(r'var\s+_var_item\s+=\s+{\s+idItem:\s+(\d+)', response.text)
         if not match:
-            return [] 
+            return []
         part.bl_id = match.groups()[0]
         part.save()
 
@@ -605,5 +698,29 @@ def get_element_prices(element, desired_quantity=1):
         return []
     items = response.json()['list']
     return [{'price': float(item['mDisplaySalePrice'].split(' ')[1]), 'storeName': item['strStorename'],
-             'country': item['strSellerCountryCode'], 
+             'country': item['strSellerCountryCode'],
              'storeUsername': item['strSellerUsername'], 'quantity': item['n4Qty']} for item in items]
+
+
+def fetch_bricklink_emails():
+    """
+    Fetch Bricklink order confirmation emails for import.
+    """
+    imap = imaplib.IMAP4_SSL(settings.BRIXDB['IMAP_HOST'])
+    try:
+        r, data = imap.login(settings.BRIXDB['IMAP_USERNAME'], settings.BRIXDB['IMAP_PASSWORD'])
+    except imaplib.IMAP4.error:
+        print("IMAP login failed, giving up.")
+        return
+
+    r, data = imap.select(settings.BRIXDB['IMAP_FOLDER'])
+    r, data = imap.search(None, 'ALL')
+    messages = data[0].split(b' ')
+    ret = []
+    for message_id in messages:
+        r, data = imap.fetch(message_id, '(RFC822)')
+        msg = email.message_from_bytes(data[0][1])
+        subject = str(msg['Subject'])
+        if order_number_old_re.match(subject) or order_number_new_re.match(subject):
+            ret.append(msg)
+    return ret

@@ -10,6 +10,7 @@ from model_utils import Choices
 from polymorphic.managers import PolymorphicManager
 from polymorphic.models import PolymorphicModel
 
+from . import managers
 from .managers import CatalogItemQuerySet, ElementQuerySet, MinifigQuerySet, PartQuerySet, SetQuerySet
 
 
@@ -98,6 +99,11 @@ class CatalogItem(PolymorphicModel):
     # most of TLG's names are horribly weird, but we'd like to keep track of them anyway
     tlg_name = models.CharField(max_length=256, blank=True, default='')
 
+    # due to Bricklink changing both names and numbers over time we need to
+    # keep lists of those to enable importing old data
+    other_names = pgfields.JSONField(default=list)
+    other_numbers = pgfields.JSONField(default=list)
+
     objects = PolymorphicManager.from_queryset(CatalogItemQuerySet)()
     all_objects = models.Manager()
 
@@ -163,12 +169,22 @@ class Colour(models.Model):
     ldraw_name = models.CharField(max_length=256, blank=True, default='')
     ldraw_number = models.PositiveIntegerField(blank=True, null=True)
 
+    # for simplicity we keep a list here of other names this colour has had,
+    # this let's us query directly for old names, such as "Light Flesh" which
+    # has become "Light Nougat"
+    other_names = pgfields.JSONField(default=list)
+
+    objects = managers.ColourQuerySet.as_manager()
+
     def __str__(self):
         return self.name
 
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)
         super(Colour, self).save(*args, **kwargs)
+
+    def parts(self):
+        return Part.objects.filter(pk__in=self.elements.values_list('part', flat=True))
 
 
 class Element(models.Model):
@@ -273,7 +289,7 @@ class BulkLot(CatalogItem):
     """
     Generic model for grouping together stuff in a lot. Used for amongst other
     things PaB orders, project support orders, brick boxes, assorted other
-    random things that are not covered by anything else, etc
+    random things that are not covered by anything else, etc.
     """
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, related_name='bulk_lots', on_delete=models.CASCADE)
     acquired = models.DateTimeField(blank=True, null=True)

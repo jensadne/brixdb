@@ -59,3 +59,15 @@ class ElementQuerySet(QuerySet):
 
 class MinifigQuerySet(CatalogItemQuerySet):
     pass
+
+
+class ColourQuerySet(QuerySet):
+    def with_owned_counts(self, user):
+        """
+        Aggregates the total amount of owned items per Colour for the given
+        User.
+        """
+        # TODO: does this belong here? :-P
+        sql = """select c.id, c.name, sum(ii.quantity * oi.quantity) as total from brixdb_colour c, brixdb_owneditem oi, brixdb_iteminventory ii, brixdb_element e where c.id = e.colour_id and e.id = ii.element_id and oi.item_id = ii.part_of_id and oi.owner_id = {user_id}
+        group by c.id order by total desc""".format(user_id=user.pk)
+
