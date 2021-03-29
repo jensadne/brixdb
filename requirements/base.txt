@@ -33,7 +33,7 @@ psycopg2-binary==2.7.7
 ptyprocess==0.6.0
 pycodestyle==2.6.0
 pyflakes==2.2.0
-Pygments==2.3.1
+Pygments==2.7.4
 pytz==2018.9
 q==2.6
 requests==2.21.0
