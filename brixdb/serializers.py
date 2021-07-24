@@ -28,7 +28,7 @@ class ColourSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class ColourDetailSerializer(serializers.HyperlinkedModelSerializer):
-    parts = PartSerializer(many=True) 
+    parts = PartSerializer(many=True)
 
     class Meta:
         model = models.Colour
@@ -69,3 +69,14 @@ class PartDetailSerializer(serializers.HyperlinkedModelSerializer):
         else:
             obj.owned_colours = []
         return super(PartDetailSerializer, self).to_representation(obj)
+
+
+class BnPElementSerializer(serializers.HyperlinkedModelSerializer):
+    # element = ElementSerializer(many=False, read_only=True)
+    name = serializers.CharField(source='element.part.name', read_only=True)
+    colour = serializers.CharField(source='element.colour.name', read_only=True)
+    price = serializers.DecimalField(max_digits=9, decimal_places=2)
+
+    class Meta:
+        model = models.BnPElement
+        fields = ('tlg_element_id', 'name', 'colour', 'image_url', 'sold_out', 'available', 'price')

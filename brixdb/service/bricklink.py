@@ -380,7 +380,7 @@ class BricklinkCatalogClient(object):
                 self.colours[colour.name] = colour
         # NOTE: we crash here if given an invalid number, while lookups by name
         #       are allowed to fail.
-        return self.colours[int(number)] if number else self.colours.get(name, None)
+        return self.colours[int(number)] if number is not None else self.colours.get(name, None)
 
     def get_element_key(self, number, colour):
         """
@@ -388,16 +388,28 @@ class BricklinkCatalogClient(object):
         """
         return '{}_{}'.format(number, colour)
 
-    def get_element(self, number, colour):
+    def get_element(self, number=None, colour=None, element_id=None):
         """
         When the item type in the inventory is ItemType.PART we actually want
         to map to an Element
         """
         if not self.elements:
             self.elements = {}
+            self.elements_by_id = {}
             for element in Element.objects.select_related('part', 'colour'):
                 elem_key = self.get_element_key(element.part.number, element.colour.number)
                 self.elements[elem_key] = element
+                # map lego ids to elements as well
+                for id_ in element.lego_ids:
+                    # this shouldn't be necessary, but BL has some duplicated ids :-/
+                    # TODO: find those and blacklist them in import_elements()
+                    if id_ not in self.elements_by_id:
+                        self.elements_by_id[id_] = element
+
+        if element_id:
+            # if we didn't have the element mapped already we most likely must
+            # create it, that is easier to do outside this method
+            return self.elements_by_id.get(int(element_id), None)
 
         colour = self.get_colour(colour)
         elem_key = '{}_{}'.format(number, colour.number)
@@ -411,13 +423,13 @@ class BricklinkCatalogClient(object):
     def get_minifig(self, number=None, name=None):
         return self.get_item(CatalogItem.TYPE.minifig, number=number, name=name)
 
-    def get_part(self, number=None, name=None):
-        return self.get_item(CatalogItem.TYPE.part, number=number, name=name)
+    def get_part(self, number=None, name=None, tlg_name=None):
+        return self.get_item(CatalogItem.TYPE.part, number=number, name=name, tlg_name=tlg_name)
 
     def get_set(self, number=None, name=None):
         return self.get_item(CatalogItem.TYPE.set, number=number, name=name)
 
-    def get_item(self, item_type, number=None, name=None, ):
+    def get_item(self, item_type, number=None, name=None, tlg_name=None):
         """
         Whenever we're not adding an Element to the Item's inventory we use
         this method. Later we intend to extend this to handle lookups by name
@@ -431,6 +443,10 @@ class BricklinkCatalogClient(object):
                 self.items['{}_{}'.format(item.item_type, slugify(item.name))] = item
                 for other_name in item.other_names:
                     self.items['{}_{}'.format(item.item_type, slugify(other_name))] = item
+                # if the item has a TLG name we'll map that as well
+                if item.tlg_name:
+                    self.items['{}_{}'.format(item.item_type, slugify(item.tlg_name))] = item
+
         # TODO: item_type kwarg really must be required for this to work
         key = '{}_{}'.format(item_type, (number if number else slugify(name)))
         item = self.items.get(key, None)
@@ -438,7 +454,7 @@ class BricklinkCatalogClient(object):
             # we allow failures when doing lookup by name, this because we
             # can't know how many words of a line in an email from Bricklink
             # actually are the item name
-            if name:
+            if name or tlg_name:
                 return None
             # try doing an extra lookup in case the item is of a different type?
             raise ValueError("Invalid number {num} for item_type {typ}!".format(num=number, typ=item_type))
@@ -543,14 +559,14 @@ class BricklinkCatalogClient(object):
         for line in lines:
             if is_content_re.match(line):
                 content_lines.append(line)
-        print(len(content_lines), 'content lines')
+        print('Order {}: {} content lines'.format(order_number, len(content_lines)))
 
         sets, parts, minifigs = [], [], []
         for line in content_lines:
-            print(line)
+            # print(line)
             # first see if it's looks like a Set as that's easiset to handle
             set_match = is_set(line)
-            print('Set match:', bool(set_match))
+            # print('Set match:', bool(set_match))
             if set_match:
                 groups = set_match.groupdict()
                 state, number, quantity = groups['state'], groups['set_number'], int(groups['quantity'])
@@ -560,7 +576,7 @@ class BricklinkCatalogClient(object):
             # evidently not a Set, see if it's a Part instead (which might also
             # be a Minifig because Bricklink)
             part_match = is_part(line)
-            print('Part match:', bool(part_match))
+            # print('Part match:', bool(part_match))
             if part_match:
                 groups = part_match.groupdict()
                 state, colour_and_item, quantity = groups['state'], groups['part_name'], int(groups['quantity'])
@@ -570,9 +586,9 @@ class BricklinkCatalogClient(object):
 
                 # we have concluded that this must be a Part, so we must find
                 # the colour and part name
-                print(f'State: {state}\nPart: {colour_and_item}\nQuantity: {quantity}\n\n')
+                # print(f'State: {state}\nPart: {colour_and_item}\nQuantity: {quantity}\n\n')
                 colour, part_name, tokens, part_offset, part = None, '', colour_and_item.split(' '), 0, None
-                print(tokens)
+                # print(tokens)
                 colour_name = tokens[0]
                 for i, token in enumerate(tokens[1:]):
                     # add the next token to colour_name until we find a Colour
@@ -597,7 +613,7 @@ class BricklinkCatalogClient(object):
                     # something. in most cases we'll find it on the first
                     # lookup so this isn't as stupid as it looks.
                     part_name = ' '.join(tokens)
-                    print(part_name)
+                    # print(part_name)
                     part = self.get_part(name=part_name)
                     if part:
                         break
@@ -608,7 +624,7 @@ class BricklinkCatalogClient(object):
                     parts.append((element, quantity))
                 else:
                     # TODO: handle unknown parts
-                    print(f'Part not found: {part_name}')
+                    print(f'Content not found: {line}')
 
         return True, {'order_number': order_number, 'parts': parts, 'sets': sets, 'minifigs': minifigs}
 

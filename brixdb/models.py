@@ -1,8 +1,8 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, UserManager
-from django.contrib.postgres import fields as pgfields
 from django.db import models
 from django.template.defaultfilters import slugify
+from django.utils import timezone
 from django.utils.translation import gettext, gettext_lazy as _
 
 from model_utils import Choices
@@ -101,8 +101,8 @@ class CatalogItem(PolymorphicModel):
 
     # due to Bricklink changing both names and numbers over time we need to
     # keep lists of those to enable importing old data
-    other_names = pgfields.JSONField(default=list)
-    other_numbers = pgfields.JSONField(default=list)
+    other_names = models.JSONField(default=list)
+    other_numbers = models.JSONField(default=list)
 
     objects = PolymorphicManager.from_queryset(CatalogItemQuerySet)()
     all_objects = models.Manager()
@@ -172,7 +172,7 @@ class Colour(models.Model):
     # for simplicity we keep a list here of other names this colour has had,
     # this let's us query directly for old names, such as "Light Flesh" which
     # has become "Light Nougat"
-    other_names = pgfields.JSONField(default=list)
+    other_names = models.JSONField(default=list)
 
     objects = managers.ColourQuerySet.as_manager()
 
@@ -195,7 +195,7 @@ class Element(models.Model):
     """
     part = models.ForeignKey(Part, related_name='elements', on_delete=models.CASCADE)
     colour = models.ForeignKey(Colour, related_name='elements', on_delete=models.CASCADE)
-    lego_ids = pgfields.JSONField(default=list)
+    lego_ids = models.JSONField(default=list)
 
     objects = ElementQuerySet.as_manager()
 
@@ -298,4 +298,38 @@ class BulkLot(CatalogItem):
         ordering = ('name', 'owner')
 
     def __str__(self):
-        return _("Bulk lot: {name}").format(name=self.name)
+        return _(f"Bulk lot: {self.name}")
+
+
+class BnPElement(models.Model):
+    """
+    Used for tracking availability and prices for Elements from Bricks&Pieces.
+    """
+    element = models.ForeignKey(Element, on_delete=models.CASCADE, related_name='bnp_elements')
+
+    # TLG's element ids might change, so we'll store the latest known one here
+    tlg_element_id = models.PositiveIntegerField()
+
+    # we might also see different image urls so for now we'll just store the complete url
+    image_url = models.URLField(max_length=512, default='')
+
+    last_updated = models.DateTimeField(default=timezone.now)
+
+    sold_out = models.BooleanField(default=False)
+    available = models.BooleanField(default=True)
+
+    objects = managers.BnPElementQuerySet.as_manager()
+
+    class Meta:
+        ordering = ('-last_updated',)
+
+
+class BnPElementPrices(models.Model):
+    """
+    To see if B&P prices change over time we'll store all the unique ones we
+    see per element.
+    """
+    first_seen = models.DateTimeField(default=timezone.now)
+    element = models.ForeignKey(BnPElement, related_name='prices', on_delete=models.CASCADE)
+    currency = models.CharField(max_length=3)
+    price = models.DecimalField(decimal_places=2, max_digits=9)

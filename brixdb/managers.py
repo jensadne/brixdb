@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 from django.db import connection
+from django.db.models import OuterRef, Subquery
 from django.db.models.expressions import RawSQL
 from django.db.models.query import QuerySet
 
@@ -70,4 +70,23 @@ class ColourQuerySet(QuerySet):
         # TODO: does this belong here? :-P
         sql = """select c.id, c.name, sum(ii.quantity * oi.quantity) as total from brixdb_colour c, brixdb_owneditem oi, brixdb_iteminventory ii, brixdb_element e where c.id = e.colour_id and e.id = ii.element_id and oi.item_id = ii.part_of_id and oi.owner_id = {user_id}
         group by c.id order by total desc""".format(user_id=user.pk)
+        return sql
 
+
+class BnPElementQuerySet(QuerySet):
+    def with_price(self):
+        from .models import BnPElementPrices
+        prices = BnPElementPrices.objects.filter(element=OuterRef('pk')).order_by('-first_seen')
+        return self.annotate(price=Subquery(prices.values('price')[:1]))
+
+    def available(self):
+        return self.filter(available=True, sold_out=False)
+
+    def default_related(self):
+        return self.select_related('element', 'element__colour', 'element__part')
+
+    def by_colour(self, colour_slug):
+        return self.filter(element__colour__slug=colour_slug)
+
+    def by_category(self, category_slug):
+        return self.filter(element__part__category__slug=category_slug)

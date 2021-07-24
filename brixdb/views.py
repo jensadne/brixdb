@@ -9,13 +9,13 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from . import serializers
+from . import models, serializers
 from .forms import SimpleIntegerForm
 from .models import Colour, Element, Set, Part
 from .service import bricklink, bricksnpieces
 
-
 import q
+
 
 class SetViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = 'number'
@@ -70,6 +70,20 @@ class ElementViewSet(viewsets.ReadOnlyModelViewSet):
         element = get_object_or_404(self.queryset, lego_ids__contains=q(int(request.query_params.get('element', 0))))
         price = bricksnpieces.get_element_prices(element)
         return Response(price)
+
+
+class BnPElementViewSet(viewsets.ModelViewSet):
+    lookup_field = 'tlg_element_id'
+    queryset = models.BnPElement.objects.all().with_price().available().default_related()
+    serializer_class = serializers.BnPElementSerializer
+
+    def get_queryset(self):
+        qs = self.queryset
+        colour_slug = self.request.query_params.get('colour', None)
+        category_slug = self.request.query_params.get('category', None)
+        qs = qs.by_colour(colour_slug) if colour_slug else qs
+        qs = qs.by_category(category_slug) if category_slug else qs
+        return qs
 
 
 @require_POST
