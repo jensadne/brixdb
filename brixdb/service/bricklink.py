@@ -10,6 +10,7 @@ import re
 from datetime import date
 
 from django.conf import settings
+from django.db import transaction
 from django.db.models import F, Q
 from django.template.defaultfilters import slugify
 
@@ -122,6 +123,7 @@ class BricklinkCatalogClient(object):
         """
         return self.fetch_catalog_file(ViewType.CATEGORIES, os.path.join('base', 'categories.txt'))
 
+    @transaction.atomic
     def import_categories(self, data):
         """
         Import flat list of categories, without parents since BL don't provide us
@@ -214,6 +216,7 @@ class BricklinkCatalogClient(object):
         """
         return self.fetch_catalog_file(ViewType.COLOURS, os.path.join('base', 'colours.txt'))
 
+    @transaction.atomic
     def import_colours(self, data):
         """
         Imports Bricklink's list of colours
@@ -233,6 +236,7 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'sets_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.SET)
 
+    @transaction.atomic
     def import_sets(self, data, item_type=Set.TYPE.set):
         """
         Imports a list of sets, gear or books downloaded from Bricklink.
@@ -261,6 +265,7 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'books_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.BOOK)
 
+    @transaction.atomic
     def import_books(self, data):
         """
         Books are treated as sets.
@@ -274,6 +279,7 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'gear_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.GEAR)
 
+    @transaction.atomic
     def import_gear(self, data):
         """
         Imports a gear list downloaded from Bricklink
@@ -284,6 +290,7 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'parts_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type=ItemType.PART)
 
+    @transaction.atomic
     def import_parts(self, data):
         """
         Imports a tab separated part list downloaded from Bricklink
@@ -304,6 +311,7 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'minifigs_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.CATALOG, file_name, item_type='M')
 
+    @transaction.atomic
     def import_minifigs(self, data):
         """
         Imports a list of minifigs downloaded from Bricklink
@@ -329,6 +337,7 @@ class BricklinkCatalogClient(object):
         file_name = os.path.join('base', 'elements_{date}.txt').format(date=date.today())
         return self.fetch_catalog_file(ViewType.ELEMENTS, file_name, item_type=ItemType.SET)
 
+    @transaction.atomic
     def import_elements(self, data, blacklist=None):
         """
         Import Bricklink's list of part+colour combinations and create Elements
@@ -462,6 +471,7 @@ class BricklinkCatalogClient(object):
             self.items[key] = item
         return self.items[key]
 
+    @transaction.atomic
     def import_inventory(self, item, data):
         """
         Parses an inventory downloaded from Bricklink and stores it locally
@@ -628,6 +638,7 @@ class BricklinkCatalogClient(object):
 
         return True, {'order_number': order_number, 'parts': parts, 'sets': sets, 'minifigs': minifigs}
 
+    @transaction.atomic
     def import_bricklink_order(owner, number, parts, sets):
         """
         Parses an order confirmation email from Bricklink and imports it as a "Set"
