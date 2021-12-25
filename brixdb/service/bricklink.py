@@ -154,7 +154,7 @@ class BricklinkCatalogClient(object):
         # dotted bl_id from the category names, separated by /, and then use
         # that to find the proper category, if necessary creating the whole
         # branch
-        if self.bl_categories is None:
+        if not self.bl_categories:
             self.bl_categories = {}
             for bl_id, name in BricklinkCategory.objects.values_list('bl_id', 'name'):
                 self.bl_categories[name] = bl_id
